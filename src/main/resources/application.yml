@@ -1,0 +1,4 @@
+recaptcha.validation.secretKey: 6LfEQRETAAAAABu9BQBb7NjRoRkYBUG8wu50cSQ5
+
+logging.level:
+  burstcoin.faucet: DEBUG
