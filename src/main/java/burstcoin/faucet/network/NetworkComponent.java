@@ -23,6 +23,7 @@
 package burstcoin.faucet.network;
 
 import burstcoin.faucet.BurstcoinFaucetProperties;
+import burstcoin.faucet.network.model.Balance;
 import burstcoin.faucet.network.model.SendMoneyResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.logging.Log;
@@ -55,19 +56,55 @@ public class NetworkComponent
         .param("requestType", "sendMoney")
         .param("recipient", recipientId)
         .param("amountNQT", amount + "00000000")
-        .param("feeNQT", "100000000")
+        .param("feeNQT", BurstcoinFaucetProperties.getFee()+"00000000")
         .param("deadline", "1000")
         .param("secretPhrase", secretPhrase)
         .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
         .send();
 
-      sendMoneyResponse = objectMapper.readValue(response.getContentAsString(), SendMoneyResponse.class);
-      LOG.info("send '" + amount + "' BURST to recipientId: '" + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
+      if(!response.getContentAsString().contains("errorDescription"))
+      {
+        sendMoneyResponse = objectMapper.readValue(response.getContentAsString(), SendMoneyResponse.class);
+        LOG.info("send '" + amount + "' BURST to recipientId: '" + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
+      }
+      else
+      {
+        LOG.error("Error: "+response.getContentAsString());
+      }
     }
     catch(Exception e)
     {
       LOG.warn("Error: Failed to 'sendMoney' to accountId '" + recipientId + "' : " + e.getMessage());
     }
     return sendMoneyResponse;
+  }
+
+  public Balance getBalance(String accountId)
+  {
+    Balance balance = null;
+    try
+    {
+      ContentResponse response = httpClient.POST(BurstcoinFaucetProperties.getWalletServer() + "/burst")
+        .param("requestType", "getBalance")
+        .param("account", accountId)
+        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
+        .send();
+
+      if(!response.getContentAsString().contains("errorDescription"))
+      {
+        balance = objectMapper.readValue(response.getContentAsString(), Balance.class);
+        LOG.info("received balance from accountId: '" + accountId + "' in '" + balance.getRequestProcessingTime() + "' ms");
+      }
+      else
+      {
+        LOG.error("Error: " + response.getContentAsString());
+      }
+    }
+    catch(Exception e)
+    {
+      LOG.warn("Error: Failed to 'getBalance' for accountId '" + accountId + "' : " + e.getMessage());
+
+    }
+    return balance;
   }
 }

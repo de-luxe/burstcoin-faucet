@@ -26,11 +26,16 @@ import burstcoin.faucet.BurstcoinFaucetProperties;
 import burstcoin.faucet.data.Account;
 import burstcoin.faucet.data.AccountRepository;
 import burstcoin.faucet.network.NetworkComponent;
+import burstcoin.faucet.network.model.Balance;
 import burstcoin.faucet.network.model.SendMoneyResponse;
 import com.github.mkopylec.recaptcha.validation.RecaptchaValidator;
+import nxt.crypto.Crypto;
+import nxt.crypto.ReedSolomon;
+import nxt.util.Convert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,7 +46,7 @@ import java.util.Date;
 @Controller
 public class FaucetController
 {
-  private static final long claimInterval = 1000 * 60 * 60 * 2; // 2h
+  private static final long claimInterval = 1000 * 60 * 60 * BurstcoinFaucetProperties.getClaimInterval();
 
   @Autowired
   private RecaptchaValidator recaptchaValidator;
@@ -53,29 +58,65 @@ public class FaucetController
   private NetworkComponent networkComponent;
 
   @RequestMapping("/")
-  public String index()
+  public String index(Model model)
   {
+    byte[] publicKey = Crypto.getPublicKey(BurstcoinFaucetProperties.getPassPhrase());
+    byte[] publicKeyHash = Crypto.sha256().digest(publicKey);
+    long accountId = Convert.fullHashToId(publicKeyHash);
+    String numericFaucetAccountId = Convert.toUnsignedLong(accountId);
+    Balance balance = networkComponent.getBalance(numericFaucetAccountId);
+
+    model.addAttribute("faucetAccount", "BURST-" + ReedSolomon.encode(accountId));
+    model.addAttribute("faucetBalance", (Long.valueOf(balance.getUnconfirmedBalanceNQT()) / 100000000) + " BURST");
+    model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
+
     return "index";
   }
 
   @RequestMapping(value = "/", method = RequestMethod.POST)
   @Transactional
-  public String claim(@RequestParam("accountId") String accountId, HttpServletRequest request)
+  public String claim(@RequestParam("accountId") String accountId, HttpServletRequest request, Model model)
   {
-    Account account = getAccount(accountId);
-    if((account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
-       && recaptchaValidator.validate(request).isSuccess())
+    // prevent claim with numericAccountId and accountId
+    try
     {
-      SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(2, accountId, BurstcoinFaucetProperties.getPassPhrase());
-      if(sendMoneyResponse != null)
-      {
-        account.setLastClaim(new Date());
-        accountRepository.save(account);
+      Long numericAccountId = Long.valueOf(accountId); // throws exception if not numeric
+      accountId = "BURST-" + ReedSolomon.encode(numericAccountId);
+    }
+    catch(Exception e)
+    {
+      // it is none numeric already ...
+    }
 
-        return "redirect:/?success=" + sendMoneyResponse.getTransaction();
+    Account account = getAccount(accountId);
+
+    if(account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
+    {
+      if(recaptchaValidator.validate(request).isSuccess())
+      {
+        SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), accountId,
+                                                                         BurstcoinFaucetProperties.getPassPhrase());
+        if(sendMoneyResponse != null)
+        {
+          account.setLastClaim(new Date());
+          accountRepository.save(account);
+
+          return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount()+ " BURST send to "+ account.getAccountId();
+        }
+        else
+        {
+          return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
+        }
       }
     }
-    return "redirect:/?error";
+    else
+    {
+      long time = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
+      return "redirect:/?error=No BURST send. Please wait at least " + (time / (60*1000)) + " minutes, before claim again.";
+    }
+
+    model.addAttribute("errorMessage", "Unexpected problem ... could not send BURST.");
+    return "redirect:/?error=Unexpected problem ... could not send BURST.";
   }
 
   private Account getAccount(@RequestParam("accountId") String accountId)

@@ -1,22 +1,30 @@
 <!DOCTYPE HTML>
 <html xmlns:th="http://www.thymeleaf.org">
+
     <head>
         <script src="https://www.google.com/recaptcha/api.js" async="async" defer="defer"></script>
         <title>Burstcoin Faucet</title>
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
     </head>
-    <body>
 
-        <p th:if="${#httpServletRequest.parameterMap.containsKey('error')}" style="color: red">Error, no Burst send!</p>
-        <p th:if="${#httpServletRequest.parameterMap.containsKey('success')}">Burst send!</p>
+    <body>
+        <span th:text="${faucetAccount}"></span>
+        -
+        <span th:text="${faucetBalance}"></span>
+        <br/>
+
+        <p th:text="${param.error[0]}" th:unless="${param.error == null}" style="color: red"></p>
+        <p th:text="${param.success[0]}" th:unless="${param.success == null}"></p>
 
         <form action="#" th:action="@{/}" method="post">
-            <div class="g-recaptcha" data-sitekey="6LfEQRETAAAAAMxkEr7RHrOE0XEUeeGUgcspSf2J"></div>
-            <br />Account:
-            <input name="accountId" type="text" title="accountId" />
-            <br />
-            <input type="submit" value="Claim Burst !" />
+            <div class="g-recaptcha" th:attr="data-sitekey=${reCaptchaPublicKey}"></div>
+            <br/>Your Account:
+            <input name="accountId" type="text" title="accountId"/>
+            <br/>
+            <br/>
+            <input type="submit" value="Claim Burst !"/>
         </form>
 
     </body>
+
 </html>

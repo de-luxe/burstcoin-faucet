@@ -49,6 +49,13 @@ public class BurstcoinFaucetProperties
   private static String walletServer;
   private static String passPhrase;
   private static String serverPort;
+  private static String privateKey;
+  private static String publicKey;
+
+  private static Integer claimInterval;
+  private static Integer claimAmount;
+  private static Integer fee;
+
 
   public static String getServerPort()
   {
@@ -59,7 +66,6 @@ public class BurstcoinFaucetProperties
     return serverPort;
   }
 
-
   public static String getWalletServer()
   {
     if(walletServer == null)
@@ -67,6 +73,24 @@ public class BurstcoinFaucetProperties
       walletServer = asString("burstcoin.faucet.walletServer", "http://localhost:8125");
     }
     return walletServer;
+  }
+
+  public static String getPrivateKey()
+  {
+    if(privateKey == null)
+    {
+      privateKey = asString("burstcoin.faucet.recaptcha.privateKey", "6LfEQRETAAAAABu9BQBb7NjRoRkYBUG8wu50cSQ5");
+    }
+    return privateKey;
+  }
+
+  public static String getPublicKey()
+  {
+    if(publicKey == null)
+    {
+      publicKey = asString("burstcoin.faucet.recaptcha.publicKey", "6LfEQRETAAAAAMxkEr7RHrOE0XEUeeGUgcspSf2J");
+    }
+    return publicKey;
   }
 
   public static String getPassPhrase()
@@ -80,6 +104,52 @@ public class BurstcoinFaucetProperties
       }
     }
     return passPhrase; // we deliver "noPassPhrase", should find no plots!
+  }
+
+  public static int getClaimInterval()
+  {
+    if(claimInterval  == null)
+    {
+      claimInterval = asInteger("burstcoin.faucet.claimInterval", 3);
+    }
+    return claimInterval;
+  }
+
+  public static int getClaimAmount()
+  {
+    if(claimAmount  == null)
+    {
+      claimAmount = asInteger("burstcoin.faucet.claimAmount", 3);
+    }
+    return claimAmount;
+  }
+
+  public static int getFee()
+  {
+    if(fee == null)
+    {
+      fee = asInteger("burstcoin.faucet.fee", 1);
+    }
+    return fee;
+  }
+
+
+  private static int asInteger(String key, int defaultValue)
+  {
+    String integerProperty = PROPS.containsKey(key) ? String.valueOf(PROPS.getProperty(key)) : null;
+    Integer value = null;
+    if(!StringUtils.isEmpty(integerProperty))
+    {
+      try
+      {
+        value = Integer.valueOf(integerProperty);
+      }
+      catch(NumberFormatException e)
+      {
+        LOG.error("value of property: '" + key + "' should be a numeric (int) value.");
+      }
+    }
+    return value != null ? value : defaultValue;
   }
 
   private static String asString(String key, String defaultValue)

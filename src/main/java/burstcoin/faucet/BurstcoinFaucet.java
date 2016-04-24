@@ -89,6 +89,7 @@ public class BurstcoinFaucet
     // overwritten by application.properties
     Map<String, Object> properties = new HashMap<String, Object>();
     properties.put("server.port", BurstcoinFaucetProperties.getServerPort());
+    properties.put("recaptcha.validation.secretKey", BurstcoinFaucetProperties.getPrivateKey());
 
     new SpringApplicationBuilder(BurstcoinFaucet.class)
       .properties(properties)
