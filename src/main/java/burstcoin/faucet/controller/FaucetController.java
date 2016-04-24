@@ -77,15 +77,10 @@ public class FaucetController
   @Transactional
   public String claim(@RequestParam("accountId") String accountId, HttpServletRequest request, Model model)
   {
-    // prevent claim with numericAccountId and accountId
-    try
+    // convert numeric account id
+    if(!accountId.contains("BURST"))
     {
-      Long numericAccountId = Long.valueOf(accountId); // throws exception if not numeric
-      accountId = "BURST-" + ReedSolomon.encode(numericAccountId);
-    }
-    catch(Exception e)
-    {
-      // it is none numeric already ...
+      accountId = "BURST-" + ReedSolomon.encode(Convert.parseUnsignedLong(accountId));
     }
 
     Account account = getAccount(accountId);
@@ -114,8 +109,6 @@ public class FaucetController
       long time = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
       return "redirect:/?error=No BURST send. Please wait at least " + (time / (60*1000)) + " minutes, before claim again.";
     }
-
-    model.addAttribute("errorMessage", "Unexpected problem ... could not send BURST.");
     return "redirect:/?error=Unexpected problem ... could not send BURST.";
   }
 
