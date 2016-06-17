@@ -86,11 +86,6 @@ a {
   position: relative;
 }
 
-.stats span
-{
-  font-size: 11px;
-}
-
 #wrapper a {
   color: rgb(95, 155, 198);
   text-decoration: underline;
@@ -408,6 +403,10 @@ p.faucet_link {
 
 #stats-wrapper p {
   margin-bottom: 15px;
+}
+
+#stats-wrapper span {
+  font-size: 13px;
 }
 
 #stats-wrapper p:first-child {

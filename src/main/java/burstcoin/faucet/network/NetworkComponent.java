@@ -32,9 +32,13 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.ContentResponse;
+import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.api.Response;
+import org.eclipse.jetty.client.util.InputStreamResponseListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -61,7 +65,7 @@ public class NetworkComponent
         .param("requestType", "sendMoney")
         .param("recipient", recipientId)
         .param("amountNQT", amount + "00000000")
-        .param("feeNQT", BurstcoinFaucetProperties.getFee()+"00000000")
+        .param("feeNQT", BurstcoinFaucetProperties.getFee() + "00000000")
         .param("deadline", "1000")
         .param("secretPhrase", secretPhrase)
         .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
@@ -74,7 +78,7 @@ public class NetworkComponent
       }
       else
       {
-        LOG.error("Error: "+response.getContentAsString());
+        LOG.error("Error: " + response.getContentAsString());
       }
     }
     catch(Exception e)
@@ -89,21 +93,33 @@ public class NetworkComponent
     Map<String, Transaction> transactionLookup = null;
     try
     {
-      ContentResponse response = httpClient.POST(BURST_API_URL)
-        .param("requestType", "getAccountTransactions")
-        .param("account", accountId)
-        .param("type", "0")
-        .param("subtype", "0")
-//        .param("sender", accountId) // todo no idea if that works
-        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
-        .send();
+      InputStreamResponseListener listener = new InputStreamResponseListener();
 
-      Transactions transactions = objectMapper.readValue(response.getContentAsString(), Transactions.class);
-      LOG.info("received '" + transactions.getTransactions().size() + "' transactions in '" + transactions.getRequestProcessingTime() + "' ms");
-      transactionLookup = new HashMap<>();
-      for(Transaction transaction : transactions.getTransactions())
+      Request request = httpClient.POST(BURST_API_URL)
+        .param("requestType", "getAccountTransactions")
+        .param("account", accountId);
+      request.send(listener);
+
+      Response response = listener.get(connectionTimeout, TimeUnit.MILLISECONDS);
+
+      // Look at the response
+      if(response.getStatus() == 200)
       {
-        transactionLookup.put(transaction.getTransaction(), transaction);
+        // Use try-with-resources to close input stream.
+        try (InputStream responseContent = listener.getInputStream())
+        {
+          Transactions transactions = objectMapper.readValue(responseContent, Transactions.class);
+          LOG.info("received '" + transactions.getTransactions().size() + "' transactions in '" + transactions.getRequestProcessingTime() + "' ms");
+          transactionLookup = new HashMap<>();
+          for(Transaction transaction : transactions.getTransactions())
+          {
+            transactionLookup.put(transaction.getTransaction(), transaction);
+          }
+        }
+        catch(Exception e)
+        {
+          LOG.error("Failed to receive faucet account transactions.");
+        }
       }
     }
     catch(Exception e)

@@ -46,11 +46,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Controller
 public class FaucetController
@@ -71,10 +74,17 @@ public class FaucetController
 
   private String numericFaucetAccountId;
   private String faucetAccountRS;
+  private Set<Character> alphabet;
+  private Stats stats;
+  private Date lastStatsUpdate;
 
   @PostConstruct
   private void init()
   {
+    alphabet = new HashSet<>(
+      Arrays.asList('2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S',
+                    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '-'));
+
     byte[] publicKey = Crypto.getPublicKey(BurstcoinFaucetProperties.getPassPhrase());
     byte[] publicKeyHash = Crypto.sha256().digest(publicKey);
     long faucetAccountId = Convert.fullHashToId(publicKeyHash);
@@ -91,7 +101,12 @@ public class FaucetController
     model.addAttribute("faucetBalance", (Long.valueOf(balance.getUnconfirmedBalanceNQT()) / 100000000) + " BURST");
     model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
 
-    Stats stats = getStats(numericFaucetAccountId);
+    if(lastStatsUpdate == null || lastStatsUpdate.getTime() < new Date().getTime() - (1000 * 60 /* 30 sec. */))
+    {
+      stats = getStats(numericFaucetAccountId);
+      lastStatsUpdate = new Date();
+    }
+
     model.addAttribute("totalClaimed", stats.getTotalClaimed());
     model.addAttribute("totalDonated", stats.getTotalDonated());
     model.addAttribute("donations", stats.getDonations());
@@ -110,7 +125,25 @@ public class FaucetController
     // convert numeric account id
     if(!accountId.contains("BURST"))
     {
-      accountId = "BURST-" + ReedSolomon.encode(Convert.parseUnsignedLong(accountId));
+      Long unsignedLong;
+      try
+      {
+        unsignedLong = Convert.parseUnsignedLong(accountId);
+      }
+      catch(Exception e)
+      {
+        return "redirect:/?error=Please enter you BURST 'Account ID' or 'Numeric Account ID'!";
+      }
+      accountId = "BURST-" + ReedSolomon.encode(unsignedLong);
+    }
+
+    // verify alphabet
+    for(char c : accountId.toCharArray())
+    {
+      if(!alphabet.contains(c))
+      {
+        return "redirect:/?error=Please enter you BURST 'Account ID' or 'Numeric Account ID'!";
+      }
     }
 
     // get client ip
@@ -203,37 +236,56 @@ public class FaucetController
     {
       if(accountId.equals(transaction.getSender()))
       {
-        totalClaims += Long.valueOf(transaction.getAmountNQT());
+        if(transaction.getRecipientRS() != null)
+        {
+          totalClaims += Long.valueOf(transaction.getAmountNQT());
 
-        ClaimStat claimStat = claimLookup.get(transaction.getRecipientRS());
-        if(claimStat == null)
-        {
-          claimStat = new ClaimStat(transaction.getTimestamp(), Long.valueOf(transaction.getAmountNQT()), 1, transaction.getRecipientRS());
-        }
-        else
-        {
-          // update claim amount
-          Long accountClaims = claimStat.getClaimed();
-          accountClaims = accountClaims + Long.valueOf(transaction.getAmountNQT());
-          claimStat.setClaimed(accountClaims);
-          // update timestamp
-          if(claimStat.getLastClaimTimestamp() < transaction.getTimestamp())
+          ClaimStat claimStat = claimLookup.get(transaction.getRecipientRS());
+          if(claimStat == null)
           {
-            claimStat.setLastClaimTimestamp(transaction.getTimestamp());
+            claimStat = new ClaimStat(transaction.getTimestamp(), Long.valueOf(transaction.getAmountNQT()), 1, transaction.getRecipientRS());
           }
-          // update number
-          claimStat.setNumberOfClaims(1 + claimStat.getNumberOfClaims());
+          else
+          {
+            // update claim amount
+            Long accountClaims = claimStat.getClaimed();
+            accountClaims = accountClaims + Long.valueOf(transaction.getAmountNQT());
+            claimStat.setClaimed(accountClaims);
+            // update timestamp
+            if(claimStat.getLastClaimTimestamp() < transaction.getTimestamp())
+            {
+              claimStat.setLastClaimTimestamp(transaction.getTimestamp());
+            }
+            // update number
+            claimStat.setNumberOfClaims(1 + claimStat.getNumberOfClaims());
+          }
+          claimLookup.put(transaction.getRecipientRS(), claimStat);
         }
-        claimLookup.put(transaction.getRecipientRS(), claimStat);
       }
       else
       {
         totalDonations += Long.valueOf(transaction.getAmountNQT());
 
-        Long accountDonations = donateLookup.get(transaction.getRecipientRS());
+        Long accountDonations = donateLookup.get(transaction.getSenderRS());
         accountDonations = accountDonations == null ? Long.valueOf(transaction.getAmountNQT()) : accountDonations + Long.valueOf(transaction.getAmountNQT());
-        donateLookup.put(transaction.getRecipientRS(), accountDonations);
+        donateLookup.put(transaction.getSenderRS(), accountDonations);
       }
+    }
+
+    // cleanup
+    Long othersDonations = 0L;
+    Set<String> others = new HashSet<>();
+    for(Map.Entry<String, Long> donateEntry : donateLookup.entrySet())
+    {
+      if(donateEntry.getValue() < 1000000000) // add donate accounts with less than 10 BURST to others
+      {
+        othersDonations += donateEntry.getValue();
+        others.add(donateEntry.getKey());
+      }
+    }
+    for(String other : others)
+    {
+      donateLookup.remove(other);
     }
 
     List<String> donations = new ArrayList<>();
@@ -241,6 +293,7 @@ public class FaucetController
     {
       donations.add(donateEntry.getKey() + " - " + (donateEntry.getValue() / 100000000) + " BURST");
     }
+    donations.add("Other Accounts - " + (othersDonations / 100000000) + " BURST");
 
     // no lookup needed anymore, add to list an sort
     List<ClaimStat> claimStats = new ArrayList<>(claimLookup.values());
@@ -251,7 +304,7 @@ public class FaucetController
       claims.add(claimStat.getNumberOfClaims() + "x " + claimStat.getAccountRS() + " - " + (claimStat.getClaimed() / 100000000) + " BURST");
     }
 
-    return new Stats("Faucet received " + (totalDonations / 100000000) + " BURST from " + donateLookup.size() + " Accounts.",
+    return new Stats("Faucet received " + (totalDonations / 100000000) + " BURST from " + (donateLookup.size() + others.size()) + " Accounts.",
                      "Faucet send " + (totalClaims / 100000000) + " BURST to " + claims.size() + " Accounts.", donations, claims);
   }
 }
