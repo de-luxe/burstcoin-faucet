@@ -25,6 +25,8 @@ package burstcoin.faucet.network;
 import burstcoin.faucet.BurstcoinFaucetProperties;
 import burstcoin.faucet.network.model.Balance;
 import burstcoin.faucet.network.model.SendMoneyResponse;
+import burstcoin.faucet.network.model.Transaction;
+import burstcoin.faucet.network.model.Transactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -33,11 +35,14 @@ import org.eclipse.jetty.client.api.ContentResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Component
 public class NetworkComponent
 {
+  private static final String BURST_API_URL = BurstcoinFaucetProperties.getWalletServer() + "/burst";
   private static Log LOG = LogFactory.getLog(NetworkComponent.class);
   private static final int connectionTimeout = 16000;
 
@@ -77,6 +82,35 @@ public class NetworkComponent
       LOG.warn("Error: Failed to 'sendMoney' to accountId '" + recipientId + "' : " + e.getMessage());
     }
     return sendMoneyResponse;
+  }
+
+  public Map<String, Transaction> getTransactions(String accountId)
+  {
+    Map<String, Transaction> transactionLookup = null;
+    try
+    {
+      ContentResponse response = httpClient.POST(BURST_API_URL)
+        .param("requestType", "getAccountTransactions")
+        .param("account", accountId)
+        .param("type", "0")
+        .param("subtype", "0")
+//        .param("sender", accountId) // todo no idea if that works
+        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
+        .send();
+
+      Transactions transactions = objectMapper.readValue(response.getContentAsString(), Transactions.class);
+      LOG.info("received '" + transactions.getTransactions().size() + "' transactions in '" + transactions.getRequestProcessingTime() + "' ms");
+      transactionLookup = new HashMap<>();
+      for(Transaction transaction : transactions.getTransactions())
+      {
+        transactionLookup.put(transaction.getTransaction(), transaction);
+      }
+    }
+    catch(Exception e)
+    {
+      LOG.warn("Error: Failed to 'getAccountTransactions' for accountId '" + accountId + "' : " + e.getMessage());
+    }
+    return transactionLookup;
   }
 
   public Balance getBalance(String accountId)

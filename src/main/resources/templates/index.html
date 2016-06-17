@@ -2,55 +2,80 @@
 <html xmlns:th="http://www.thymeleaf.org">
 
     <head>
-        <script src="https://www.google.com/recaptcha/api.js" async="async" defer="defer"></script>
         <title>Burstcoin Faucet</title>
         <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+        <meta name="viewport" content="width=device-width"/>
 
         <link rel="stylesheet" type="text/css" media="all" th:href="@{/css/style.css}"/>
+        <script src="https://www.google.com/recaptcha/api.js" async="async" defer="defer"></script>
     </head>
 
     <body>
 
-        <div id="burstcoin_faucet">
-            <br/><br/>
+        <br/>
+        <br/>
 
-            <div id="wrapper">
-                <div id="claim" class="animate form">
-                    <form autocomplete="on" action="#" th:action="@{/}" method="post">
-                        <h1>Burstcoin Faucet</h1>
+        <div id="wrapper" style="min-height: 550px">
+            <div id="claim" class="animate form">
+                <form autocomplete="on" action="#" th:action="@{/}" method="post">
+                    <h1>Burstcoin Faucet</h1>
 
-                        <p th:text="${param.error[0]}" th:unless="${param.error == null}" style="color: red"></p>
+                    <p th:text="${param.error[0]}" th:unless="${param.error == null}" style="color: red"></p>
 
-                        <p th:text="${param.success[0]}" th:unless="${param.success == null}"></p>
+                    <p th:text="${param.success[0]}" th:unless="${param.success == null}"></p>
+                    <br/>
+                    <label for="accountId"> Your Burstcoin Account </label>
+                    <input id="accountId" type="text" placeholder="'Account ID' or 'Numeric Account ID'" required="required" name="accountId"/>
+                    <br/>
+                    <br/>
 
-                        <br/>
+                    <div class="g-recaptcha" style="height:78px; text-align: center" th:attr="data-sitekey=${reCaptchaPublicKey}"></div>
+                    <br/>
 
-                        <label for="accountId"> Your Burstcoin Account </label>
-                        <input id="accountId" type="text" placeholder="'Account ID' or 'Numeric Account ID'" required="required" name="accountId"/>
+                    <p class="claim button">
+                        <input type="submit" value="Claim Burst"/>
+                    </p>
 
-                        <br/>
-                        <br/>
+                    <p class="faucet_link">
+                        <a class="to_register" href="https://github.com/de-luxe/burstcoin-faucet/releases">
+                            <span th:text="${faucetAccount}"></span>
+                            -
+                            <span th:text="${faucetBalance}"></span>
+                        </a>
+                    </p>
+                </form>
+            </div>
+        </div>
 
-                        <div class="g-recaptcha" style="height:78px; text-align: center" th:attr="data-sitekey=${reCaptchaPublicKey}"></div>
+        <div id="stats-wrapper">
+            <div id="stats">
 
-                        <br/>
+                <h1>Donations</h1>
 
-                        <p class="claim button">
-                            <input type="submit" value="Claim Burst"/>
-                        </p>
+                <p th:text="${totalDonated}"></p>
 
-                        <p class="faucet_link">
-                            <a class="to_register" href="https://github.com/de-luxe/burstcoin-faucet">
-                                <span th:text="${faucetAccount}"></span>
-                                -
-                                <span th:text="${faucetBalance}"></span>
-                            </a>
-                        </p>
-                    </form>
+                <div th:each="donate,iterStat : ${donations}">
+                    <span th:text="${donate}"/>
                 </div>
+
+                <br/><br/><br/>
+
+                <h1>Claims</h1>
+
+                <p th:text="${totalClaimed}"></p>
+
+                <div th:each="claim,iterStat : ${claims}">
+                    <span th:text="${claim}"/>
+                </div>
+
+                <br/>
 
             </div>
         </div>
+
+        <br/>
+        <br/>
+        <br/>
 
     </body>
 

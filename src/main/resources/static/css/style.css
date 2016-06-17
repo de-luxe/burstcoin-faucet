@@ -12,6 +12,7 @@ html, body {
 h1, h2, h3, h4, h5, h6 {
   font-size: 100%;
   font-weight: normal;
+  z-index: 22;
 }
 
 q:before, q:after {
@@ -28,12 +29,6 @@ body {
   font-size: 15px;
   color: #1d3c41;
   overflow-y: scroll;
-}
-
-#burstcoin_faucet {
-  text-align: left;
-  padding: 0;
-  font-family: Arial, sans-serif;
 }
 
 a {
@@ -74,16 +69,26 @@ a {
 
 .container > header h1 span {
   color: #7cbcd6;
-  text-shadow: 0px 1px 1px rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.8);
 }
 
 #wrapper {
 
+  text-align: left;
+  padding: 0;
+  font-family: Arial, sans-serif;
+
   right: 0;
-  min-height: 560px;
+  min-height: 630px;
   margin: 0 auto;
-  width: 500px;
+  max-width: 500px;
+  min-width: 250px;
   position: relative;
+}
+
+.stats span
+{
+  font-size: 11px;
 }
 
 #wrapper a {
@@ -186,7 +191,7 @@ input {
 }
 
 #wrapper p.button input {
-  width: 30%;
+  width: 130px;
   cursor: pointer;
   background: rgb(61, 157, 179);
   padding: 8px 5px;
@@ -235,47 +240,19 @@ p.claim.button {
 }
 
 p.faucet_link {
-  position: absolute;
+  position: center;
   color: rgb(127, 124, 124);
   left: 0;
   height: 20px;
-  width: 440px;
-  padding: 17px 30px 20px 30px;
+  max-width: 500px;
+  min-width: 250px;
+  padding: 10px 10px 10px 10px;
   font-size: 16px;
-  text-align: right;
+  text-align: center;
   border-top: 1px solid rgb(219, 229, 232);
   -webkit-border-radius: 0 0 5px 5px;
   -moz-border-radius: 0 0 5px 5px;
   border-radius: 0 0 5px 5px;
-  background: rgb(225, 234, 235);
-  background: -moz-repeating-linear-gradient(-45deg,
-  rgb(247, 247, 247),
-  rgb(247, 247, 247) 15px,
-  rgb(225, 234, 235) 15px,
-  rgb(225, 234, 235) 30px,
-  rgb(247, 247, 247) 30px
-  );
-  background: -webkit-repeating-linear-gradient(-45deg,
-  rgb(247, 247, 247),
-  rgb(247, 247, 247) 15px,
-  rgb(225, 234, 235) 15px,
-  rgb(225, 234, 235) 30px,
-  rgb(247, 247, 247) 30px
-  );
-  background: -o-repeating-linear-gradient(-45deg,
-  rgb(247, 247, 247),
-  rgb(247, 247, 247) 15px,
-  rgb(225, 234, 235) 15px,
-  rgb(225, 234, 235) 30px,
-  rgb(247, 247, 247) 30px
-  );
-  background: repeating-linear-gradient(-45deg,
-  rgb(247, 247, 247),
-  rgb(247, 247, 247) 15px,
-  rgb(225, 234, 235) 15px,
-  rgb(225, 234, 235) 30px,
-  rgb(247, 247, 247) 30px
-  );
 }
 
 #wrapper p.faucet_link a {
@@ -312,13 +289,26 @@ p.faucet_link {
   position: absolute;
   top: 0;
   width: 88%;
-  padding: 18px 6% 60px 6%;
+  padding: 18px 6% 10px 6%;
   margin: 0 0 35px 0;
   background: rgb(247, 247, 247);
   border: 1px solid rgba(147, 184, 189, 0.8);
-  -webkit-box-shadow: 0pt 2px 5px rgba(105, 108, 109, 0.7), 0px 0px 8px 5px rgba(208, 223, 226, 0.4) inset;
-  -moz-box-shadow: 0pt 2px 5px rgba(105, 108, 109, 0.7), 0px 0px 8px 5px rgba(208, 223, 226, 0.4) inset;
-  box-shadow: 0pt 2px 5px rgba(105, 108, 109, 0.7), 0px 0px 8px 5px rgba(208, 223, 226, 0.4) inset;
+  -moz-box-shadow: 0 2px 5px rgba(105, 108, 109, 0.7), 0 0 8px 5px rgba(208, 223, 226, 0.4) inset;
+  box-shadow: 0 2px 5px rgba(105, 108, 109, 0.7), 0 0 8px 5px rgba(208, 223, 226, 0.4) inset;
+  -webkit-box-shadow: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+}
+
+#stats {
+
+  width: 88%;
+  padding: 18px 6% 10px 6%;
+  margin: 0 0 35px 0;
+  background: rgb(247, 247, 247);
+  border: 1px solid rgba(147, 184, 189, 0.8);
+  -moz-box-shadow: 0 2px 5px rgba(105, 108, 109, 0.7), 0 0 8px 5px rgba(208, 223, 226, 0.4) inset;
+  box-shadow: 0 2px 5px rgba(105, 108, 109, 0.7), 0 0 8px 5px rgba(208, 223, 226, 0.4) inset;
   -webkit-box-shadow: 5px;
   -moz-border-radius: 5px;
   border-radius: 5px;
@@ -359,4 +349,105 @@ p.faucet_link {
   position: absolute;
   height: 90px;
   background: transparent;
+}
+
+#stats-wrapper {
+
+  text-align: left;
+  padding: 0;
+  font-family: Arial, sans-serif;
+
+  right: 0;
+  min-height: 630px;
+  margin: 0 auto;
+  max-width: 500px;
+  min-width: 250px;
+  position: relative;
+}
+
+#stats-wrapper a {
+  color: rgb(95, 155, 198);
+  text-decoration: underline;
+}
+
+#stats-wrapper h1 {
+  font-size: 48px;
+  color: rgb(6, 106, 117);
+  padding: 2px 0 10px 0;
+  font-family: Arial, sans-serif;
+  font-weight: bold;
+  text-align: center;
+  padding-bottom: 30px;
+}
+
+/** For the moment only webkit supports the background-clip:text; */
+#stats-wrapper h1 {
+  background: -webkit-repeating-linear-gradient(-45deg,
+  rgb(18, 83, 93),
+  rgb(18, 83, 93) 20px,
+  rgb(64, 111, 118) 20px,
+  rgb(64, 111, 118) 40px,
+  rgb(18, 83, 93) 40px);
+  -webkit-text-fill-color: transparent;
+  -webkit-background-clip: content-box;
+}
+
+#stats-wrapper h1:after {
+  content: ' ';
+  display: block;
+  width: 100%;
+  height: 2px;
+  margin-top: 10px;
+  background: -moz-linear-gradient(left, rgba(147, 184, 189, 0) 0%, rgba(147, 184, 189, 0.8) 20%, rgba(147, 184, 189, 1) 53%, rgba(147, 184, 189, 0.8) 79%, rgba(147, 184, 189, 0) 100%);
+  background: -webkit-gradient(linear, left top, right top, color-stop(0%, rgba(147, 184, 189, 0)), color-stop(20%, rgba(147, 184, 189, 0.8)), color-stop(53%, rgba(147, 184, 189, 1)), color-stop(79%, rgba(147, 184, 189, 0.8)), color-stop(100%, rgba(147, 184, 189, 0)));
+  background: -webkit-linear-gradient(left, rgba(147, 184, 189, 0) 0%, rgba(147, 184, 189, 0.8) 20%, rgba(147, 184, 189, 1) 53%, rgba(147, 184, 189, 0.8) 79%, rgba(147, 184, 189, 0) 100%);
+  background: -o-linear-gradient(left, rgba(147, 184, 189, 0) 0%, rgba(147, 184, 189, 0.8) 20%, rgba(147, 184, 189, 1) 53%, rgba(147, 184, 189, 0.8) 79%, rgba(147, 184, 189, 0) 100%);
+  background: -ms-linear-gradient(left, rgba(147, 184, 189, 0) 0%, rgba(147, 184, 189, 0.8) 20%, rgba(147, 184, 189, 1) 53%, rgba(147, 184, 189, 0.8) 79%, rgba(147, 184, 189, 0) 100%);
+  background: linear-gradient(left, rgba(147, 184, 189, 0) 0%, rgba(147, 184, 189, 0.8) 20%, rgba(147, 184, 189, 1) 53%, rgba(147, 184, 189, 0.8) 79%, rgba(147, 184, 189, 0) 100%);
+}
+
+#stats-wrapper p {
+  margin-bottom: 15px;
+}
+
+#stats-wrapper p:first-child {
+  margin: 0;
+}
+
+#stats-wrapper label {
+  color: rgb(64, 92, 96);
+  position: relative;
+}
+
+#stats-wrapper p.button input {
+  width: 130px;
+  cursor: pointer;
+  background: rgb(61, 157, 179);
+  padding: 8px 5px;
+  font-family: 'BebasNeueRegular', 'Arial Narrow', Arial, sans-serif;
+  color: #fff;
+  font-size: 24px;
+  border: 1px solid rgb(28, 108, 122);
+  margin-bottom: 10px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
+  -webkit-border-radius: 3px;
+  -moz-border-radius: 3px;
+  border-radius: 3px;
+  -webkit-box-shadow: 0 1px 6px 4px rgba(0, 0, 0, 0.07) inset,
+  0 0 0 3px rgb(254, 254, 254),
+  0 5px 3px 3px rgb(210, 210, 210);
+  -moz-box-shadow: 0 1px 6px 4px rgba(0, 0, 0, 0.07) inset,
+  0 0 0 3px rgb(254, 254, 254),
+  0 5px 3px 3px rgb(210, 210, 210);
+  box-shadow: 0 1px 6px 4px rgba(0, 0, 0, 0.07) inset,
+  0 0 0 3px rgb(254, 254, 254),
+  0 5px 3px 3px rgb(210, 210, 210);
+  -webkit-transition: all 0.2s linear;
+  -moz-transition: all 0.2s linear;
+  -o-transition: all 0.2s linear;
+  transition: all 0.2s linear;
+}
+
+.lt8 #stats-wrapper h1 {
+  color: #066A75;
 }
