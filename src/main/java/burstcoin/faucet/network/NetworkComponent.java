@@ -152,8 +152,7 @@ public class NetworkComponent
     }
     catch(Exception e)
     {
-      LOG.warn("Error: Failed to 'getBalance' for accountId '" + accountId + "' : " + e.getMessage());
-
+      LOG.warn("Error: Failed to 'getBalance' for accountId '" + accountId + "' : " + e.getMessage(), e);
     }
     return balance;
   }

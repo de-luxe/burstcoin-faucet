@@ -101,7 +101,7 @@ public class FaucetController
     model.addAttribute("faucetBalance", (Long.valueOf(balance.getUnconfirmedBalanceNQT()) / 100000000) + " BURST");
     model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
 
-    if(lastStatsUpdate == null || lastStatsUpdate.getTime() < new Date().getTime() - (1000 * 60 /* 30 sec. */))
+    if(lastStatsUpdate == null || lastStatsUpdate.getTime() < new Date().getTime() - (1000 * 60 * 5 /* 5 minutes */))
     {
       stats = getStats(numericFaucetAccountId);
       lastStatsUpdate = new Date();
@@ -146,53 +146,62 @@ public class FaucetController
       }
     }
 
-    // get client ip
-    String ip = request.getHeader("X-FORWARDED-FOR");
-    if(ip == null)
-    {
-      ip = request.getRemoteAddr();
-    }
-
-    IPAddress ipAddress = null;
-    if(ip != null)
-    {
-      ipAddress = getIPAddress(ip);
-    }
-    boolean ipCanClaim = ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval);
-
+    // check account
     Account account = getAccount(accountId);
-    boolean addressCanClaim = account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval);
-
-    if(ipCanClaim && addressCanClaim)
+    if(account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
     {
-      if(recaptchaValidator.validate(request).isSuccess())
+      // check ip
+      String ip = request.getHeader("X-FORWARDED-FOR");
+      if(ip == null)
       {
-        SendMoneyResponse sendMoneyResponse = networkComponent
-          .sendMoney(BurstcoinFaucetProperties.getClaimAmount(), accountId, BurstcoinFaucetProperties.getPassPhrase());
-        if(sendMoneyResponse != null)
+        ip = request.getRemoteAddr();
+      }
+
+      IPAddress ipAddress = null;
+      if(ip != null)
+      {
+        ipAddress = getIPAddress(ip);
+      }
+
+      if(ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval))
+      {
+        // check recaptcha
+        if(recaptchaValidator.validate(request).isSuccess())
         {
-          if(ipAddress != null)
+          SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), accountId,
+                                                                           BurstcoinFaucetProperties.getPassPhrase());
+          if(sendMoneyResponse != null)
           {
-            ipAddress.setLastClaim(new Date());
-            ipAddressRepository.save(ipAddress);
+            // update ip
+            if(ipAddress != null)
+            {
+              ipAddress.setLastClaim(new Date());
+              ipAddressRepository.save(ipAddress);
+            }
+
+            // update account
+            account.setLastClaim(new Date());
+            accountRepository.save(account);
+
+            return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount() + " BURST send to " + account.getAccountId();
           }
-
-          account.setLastClaim(new Date());
-          accountRepository.save(account);
-
-          return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount() + " BURST send to " + account.getAccountId();
+          else
+          {
+            return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
+          }
         }
-        else
-        {
-          return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
-        }
+      }
+      else
+      {
+        long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
+        return "redirect:/?error=No BURST send. Please wait at least " + ((ipTime) / (60 * 1000))
+               + " minutes, before claim again with your accounts.";
       }
     }
     else
     {
       long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-      long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-      return "redirect:/?error=No BURST send. Please wait at least " + ((ipTime > accountTime ? ipTime : accountTime) / (60 * 1000))
+      return "redirect:/?error=No BURST send. Please wait at least " + ((accountTime) / (60 * 1000))
              + " minutes, before claim again.";
     }
     return "redirect:/?error=Unexpected problem ... could not send BURST.";
