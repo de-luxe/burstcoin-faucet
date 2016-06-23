@@ -35,6 +35,8 @@ import com.github.mkopylec.recaptcha.validation.RecaptchaValidator;
 import nxt.crypto.Crypto;
 import nxt.crypto.ReedSolomon;
 import nxt.util.Convert;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +46,9 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.annotation.PostConstruct;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -59,6 +63,8 @@ import java.util.Set;
 public class FaucetController
 {
   private static final long claimInterval = 1000 * 60 * 60 * BurstcoinFaucetProperties.getClaimInterval();
+  private static final String SECURE_COOKIE_NAME = "lc";
+  private static Log LOG = LogFactory.getLog(FaucetController.class);
 
   @Autowired
   private RecaptchaValidator recaptchaValidator;
@@ -117,7 +123,7 @@ public class FaucetController
 
   @RequestMapping(value = "/", method = RequestMethod.POST)
   @Transactional
-  public String claim(@RequestParam("accountId") String accountId, HttpServletRequest request)
+  public String claim(@RequestParam("accountId") String accountId, HttpServletRequest request, HttpServletResponse response)
   {
     // get rid of leading/ending space
     accountId = accountId.trim();
@@ -132,6 +138,8 @@ public class FaucetController
       }
       catch(Exception e)
       {
+        LOG.info("Claim not possible, invalid account: " + accountId);
+
         return "redirect:/?error=Please enter you BURST 'Account ID' or 'Numeric Account ID'!";
       }
       accountId = "BURST-" + ReedSolomon.encode(unsignedLong);
@@ -142,6 +150,8 @@ public class FaucetController
     {
       if(!alphabet.contains(c))
       {
+        LOG.info("Claim not possible, invalid account: " + accountId);
+
         return "redirect:/?error=Please enter you BURST 'Account ID' or 'Numeric Account ID'!";
       }
     }
@@ -165,34 +175,70 @@ public class FaucetController
 
       if(ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval))
       {
-        // check recaptcha
-        if(recaptchaValidator.validate(request).isSuccess())
+        // get cookie lastClaim
+        Long lastClaimCookie = null;
+        List<Cookie> cookies = Arrays.asList(request.getCookies());
+        for(Cookie cookie : cookies)
         {
-          SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), accountId,
-                                                                           BurstcoinFaucetProperties.getPassPhrase());
-          if(sendMoneyResponse != null)
+          if(SECURE_COOKIE_NAME.equals(cookie.getName()))
           {
-            // update ip
-            if(ipAddress != null)
+            try
             {
-              ipAddress.setLastClaim(new Date());
-              ipAddressRepository.save(ipAddress);
+              lastClaimCookie = Long.valueOf(cookie.getValue());
             }
-
-            // update account
-            account.setLastClaim(new Date());
-            accountRepository.save(account);
-
-            return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount() + " BURST send to " + account.getAccountId();
+            catch(Exception e)
+            {
+              lastClaimCookie = null;
+            }
           }
-          else
+        }
+
+        // check cookie lastClaim
+        if(lastClaimCookie == null || new Date().getTime() > (lastClaimCookie + claimInterval))
+        {
+          // check recaptcha
+          if(recaptchaValidator.validate(request).isSuccess())
           {
-            return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
+            SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), accountId,
+                                                                             BurstcoinFaucetProperties.getPassPhrase());
+            if(sendMoneyResponse != null)
+            {
+              // update ip
+              if(ipAddress != null)
+              {
+                ipAddress.setLastClaim(new Date());
+                ipAddressRepository.save(ipAddress);
+              }
+
+              // update account
+              account.setLastClaim(new Date());
+              accountRepository.save(account);
+
+              Cookie lastClaim = new Cookie(SECURE_COOKIE_NAME, String.valueOf(new Date().getTime()));
+              lastClaim.setMaxAge(60 * 60 * 24 * 90);
+              response.addCookie(lastClaim);
+
+              return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount() + " BURST send to " + account.getAccountId();
+            }
+            else
+            {
+              return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
+            }
           }
+        }
+        else
+        {
+          LOG.info("Claim denied by COOKIE, account: " + accountId);
+
+          long cookieTime = (lastClaimCookie + claimInterval) - new Date().getTime();
+          return "redirect:/?error=No BURST send. Please wait at least " + ((cookieTime) / (60 * 1000))
+                 + " minutes, before claim again with your accounts.";
         }
       }
       else
       {
+        LOG.info("Claim denied by IP, account: " + accountId);
+
         long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
         return "redirect:/?error=No BURST send. Please wait at least " + ((ipTime) / (60 * 1000))
                + " minutes, before claim again with your accounts.";
@@ -200,6 +246,8 @@ public class FaucetController
     }
     else
     {
+      LOG.info("Claim denied by ACCOUNT, account: " + accountId);
+
       long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
       return "redirect:/?error=No BURST send. Please wait at least " + ((accountTime) / (60 * 1000))
              + " minutes, before claim again.";
