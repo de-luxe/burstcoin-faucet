@@ -101,18 +101,6 @@ a {
   padding-bottom: 30px;
 }
 
-/** For the moment only webkit supports the background-clip:text; */
-#wrapper h1 {
-  background: -webkit-repeating-linear-gradient(-45deg,
-  rgb(18, 83, 93),
-  rgb(18, 83, 93) 20px,
-  rgb(64, 111, 118) 20px,
-  rgb(64, 111, 118) 40px,
-  rgb(18, 83, 93) 40px);
-  -webkit-text-fill-color: transparent;
-  -webkit-background-clip: content-box;
-}
-
 #wrapper h1:after {
   content: ' ';
   display: block;
@@ -296,7 +284,8 @@ p.faucet_link {
 }
 
 #stats {
-
+  overflow: auto;
+  height: 650px;
   width: 88%;
   padding: 18px 6% 10px 6%;
   margin: 0 0 35px 0;
@@ -373,18 +362,6 @@ p.faucet_link {
   font-weight: bold;
   text-align: center;
   padding-bottom: 30px;
-}
-
-/** For the moment only webkit supports the background-clip:text; */
-#stats-wrapper h1 {
-  background: -webkit-repeating-linear-gradient(-45deg,
-  rgb(18, 83, 93),
-  rgb(18, 83, 93) 20px,
-  rgb(64, 111, 118) 20px,
-  rgb(64, 111, 118) 40px,
-  rgb(18, 83, 93) 40px);
-  -webkit-text-fill-color: transparent;
-  -webkit-background-clip: content-box;
 }
 
 #stats-wrapper h1:after {
