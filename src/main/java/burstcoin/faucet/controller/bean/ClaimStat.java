@@ -20,7 +20,7 @@
  *
  */
 
-package burstcoin.faucet.controller;
+package burstcoin.faucet.controller.bean;
 
 public class ClaimStat
   implements Comparable<ClaimStat>

@@ -20,43 +20,40 @@
  *
  */
 
-package burstcoin.faucet.controller;
+package burstcoin.faucet.controller.bean;
 
-import java.util.List;
-
-public class Stats
+public class AccountCheck
 {
-  private String totalDonated;
-  private String totalClaimed;
+  private boolean success;
+  private String accountId;
+  private String error;
 
-  private List<String> donations;
-  private List<String> claims;
-
-  public Stats(String totalDonated, String totalClaimed, List<String> donations, List<String> claims)
+  public AccountCheck(String accountId, String error)
   {
-    this.totalDonated = totalDonated;
-    this.totalClaimed = totalClaimed;
-    this.donations = donations;
-    this.claims = claims;
+    this.success = false;
+    this.accountId = accountId;
+    this.error = error;
   }
 
-  public String getTotalDonated()
+  public AccountCheck(String accountId)
   {
-    return totalDonated;
+    this.success = true;
+    this.accountId = accountId;
+    this.error = null;
   }
 
-  public String getTotalClaimed()
+  public boolean isSuccess()
   {
-    return totalClaimed;
+    return success;
   }
 
-  public List<String> getDonations()
+  public String getAccountId()
   {
-    return donations;
+    return accountId;
   }
 
-  public List<String> getClaims()
+  public String getError()
   {
-    return claims;
+    return error;
   }
 }

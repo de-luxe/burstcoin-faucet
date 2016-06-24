@@ -23,6 +23,9 @@
 package burstcoin.faucet.controller;
 
 import burstcoin.faucet.BurstcoinFaucetProperties;
+import burstcoin.faucet.controller.bean.AccountCheck;
+import burstcoin.faucet.controller.bean.ClaimStat;
+import burstcoin.faucet.controller.bean.Stats;
 import burstcoin.faucet.data.Account;
 import burstcoin.faucet.data.AccountRepository;
 import burstcoin.faucet.data.IPAddress;
@@ -41,6 +44,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -125,134 +129,168 @@ public class FaucetController
   @Transactional
   public String claim(@RequestParam("accountId") String accountId, HttpServletRequest request, HttpServletResponse response)
   {
-    // get rid of leading/ending space
-    accountId = accountId.trim();
-
-    // convert numeric account id
-    if(!accountId.contains("BURST"))
+    // check recaptcha
+    if(recaptchaValidator.validate(request).isSuccess())
     {
-      Long unsignedLong;
-      try
+      // check input
+      AccountCheck accountCheck = checkAccountId(accountId);
+      if(!accountCheck.isSuccess())
       {
-        unsignedLong = Convert.parseUnsignedLong(accountId);
+        return "redirect:/?error=" + accountCheck.getError();
       }
-      catch(Exception e)
+      else
       {
-        LOG.info("Claim not possible, invalid account: " + accountId);
-
-        return "redirect:/?error=Please enter you BURST 'Account ID' or 'Numeric Account ID'!";
-      }
-      accountId = "BURST-" + ReedSolomon.encode(unsignedLong);
-    }
-
-    // verify alphabet
-    for(char c : accountId.toCharArray())
-    {
-      if(!alphabet.contains(c))
-      {
-        LOG.info("Claim not possible, invalid account: " + accountId);
-
-        return "redirect:/?error=Please enter you BURST 'Account ID' or 'Numeric Account ID'!";
-      }
-    }
-
-    // check account
-    Account account = getAccount(accountId);
-    if(account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
-    {
-      // check ip
-      String ip = request.getHeader("X-FORWARDED-FOR");
-      if(ip == null)
-      {
-        ip = request.getRemoteAddr();
-      }
-
-      IPAddress ipAddress = null;
-      if(ip != null)
-      {
-        ipAddress = getIPAddress(ip);
-      }
-
-      if(ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval))
-      {
-        // get cookie lastClaim
-        Long lastClaimCookie = null;
-        List<Cookie> cookies = Arrays.asList(request.getCookies());
-        for(Cookie cookie : cookies)
+        // check account last claim
+        Account account = getAccount(accountCheck.getAccountId());
+        if(account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
         {
-          if(SECURE_COOKIE_NAME.equals(cookie.getName()))
+          // check ip last claim
+          String ip = request.getHeader("X-FORWARDED-FOR");
+          if(ip == null)
           {
-            try
-            {
-              lastClaimCookie = Long.valueOf(cookie.getValue());
-            }
-            catch(Exception e)
-            {
-              lastClaimCookie = null;
-            }
+            ip = request.getRemoteAddr();
           }
-        }
 
-        // check cookie lastClaim
-        if(lastClaimCookie == null || new Date().getTime() > (lastClaimCookie + claimInterval))
-        {
-          // check recaptcha
-          if(recaptchaValidator.validate(request).isSuccess())
+          IPAddress ipAddress = null;
+          if(ip != null)
           {
-            SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), accountId,
-                                                                             BurstcoinFaucetProperties.getPassPhrase());
-            if(sendMoneyResponse != null)
+            ipAddress = getIPAddress(ip);
+          }
+
+          if(ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval))
+          {
+            // get cookie lastClaim
+            Long lastClaimCookie = null;
+            List<Cookie> cookies = Arrays.asList(request.getCookies());
+            for(Cookie cookie : cookies)
             {
-              // update ip
-              if(ipAddress != null)
+              if(SECURE_COOKIE_NAME.equals(cookie.getName()))
               {
-                ipAddress.setLastClaim(new Date());
-                ipAddressRepository.save(ipAddress);
+                try
+                {
+                  lastClaimCookie = Long.valueOf(cookie.getValue());
+                }
+                catch(Exception e)
+                {
+                  lastClaimCookie = null;
+                }
               }
+            }
 
-              // update account
-              account.setLastClaim(new Date());
-              accountRepository.save(account);
+            // check cookie last claim
+            if(lastClaimCookie == null || new Date().getTime() > (lastClaimCookie + claimInterval))
+            {
+              SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), account.getAccountId(),
+                                                                               BurstcoinFaucetProperties.getPassPhrase());
+              if(sendMoneyResponse != null)
+              {
+                // update ip
+                if(ipAddress != null)
+                {
+                  ipAddress.setLastClaim(new Date());
+                  ipAddressRepository.save(ipAddress);
+                }
 
-              Cookie lastClaim = new Cookie(SECURE_COOKIE_NAME, String.valueOf(new Date().getTime()));
-              lastClaim.setMaxAge(60 * 60 * 24 * 90);
-              response.addCookie(lastClaim);
+                // update account
+                account.setLastClaim(new Date());
+                accountRepository.save(account);
 
-              return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount() + " BURST send to " + account.getAccountId();
+                Cookie lastClaim = new Cookie(SECURE_COOKIE_NAME, String.valueOf(new Date().getTime()));
+                lastClaim.setMaxAge(60 * 60 * 24 * 90);
+                response.addCookie(lastClaim);
+
+                return "redirect:/?success=" + BurstcoinFaucetProperties.getClaimAmount() + " BURST send to " + account.getAccountId();
+              }
+              else
+              {
+                LOG.info("Claim failed by 'WALLET_ACCESS', account '" + account.getAccountId() + "'.");
+
+                return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
+              }
             }
             else
             {
-              return "redirect:/?error=Sry, faucet could not access Wallet, to send your BURST.";
+              LOG.info("Claim denied by COOKIE, account '" + account.getAccountId() + "'.");
+
+              long cookieTime = (lastClaimCookie + claimInterval) - new Date().getTime();
+              return "redirect:/?error=No BURST send. Please wait at least " + ((cookieTime) / (60 * 1000))
+                     + " minutes, before claim again with your accounts.";
             }
+          }
+          else
+          {
+            LOG.info("Claim denied by IP, account '" + account.getAccountId() + "'.");
+
+            long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
+            return "redirect:/?error=No BURST send. Please wait at least " + ((ipTime) / (60 * 1000))
+                   + " minutes, before claim again with your accounts.";
           }
         }
         else
         {
-          LOG.info("Claim denied by COOKIE, account: " + accountId);
+          LOG.info("Claim denied by ACCOUNT, account '" + account.getAccountId() + "'.");
 
-          long cookieTime = (lastClaimCookie + claimInterval) - new Date().getTime();
-          return "redirect:/?error=No BURST send. Please wait at least " + ((cookieTime) / (60 * 1000))
-                 + " minutes, before claim again with your accounts.";
+          long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
+          return "redirect:/?error=No BURST send. Please wait at least " + ((accountTime) / (60 * 1000))
+                 + " minutes, before claim again.";
         }
-      }
-      else
-      {
-        LOG.info("Claim denied by IP, account: " + accountId);
-
-        long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-        return "redirect:/?error=No BURST send. Please wait at least " + ((ipTime) / (60 * 1000))
-               + " minutes, before claim again with your accounts.";
       }
     }
     else
     {
-      LOG.info("Claim denied by ACCOUNT, account: " + accountId);
+      LOG.info("Claim failed by 'RECAPTCHA', account '" + accountId + "'.");
 
-      long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-      return "redirect:/?error=No BURST send. Please wait at least " + ((accountTime) / (60 * 1000))
-             + " minutes, before claim again.";
+      return "redirect:/?error=Please confirm, that you are no robot.";
     }
-    return "redirect:/?error=Unexpected problem ... could not send BURST.";
+  }
+
+  private AccountCheck checkAccountId(String accountId)
+  {
+    AccountCheck accountCheck = null;
+    if(StringUtils.isEmpty(accountId) || accountId.length() < 15)
+    {
+      LOG.info("Claim failed by 'ADDRESS_INVALID', malformed account: " + accountId);
+      accountCheck = new AccountCheck(accountId, "Please enter your BURST 'Account ID' or 'Numeric Account ID'! '" + accountId + "' is not valid!");
+    }
+    else
+    {
+      // get rid of leading/ending space
+      accountId = accountId.trim();
+
+      // convert numeric account id
+      if(!accountId.contains("BURST"))
+      {
+        try
+        {
+          Long unsignedLong = Convert.parseUnsignedLong(accountId);
+          accountId = "BURST-" + ReedSolomon.encode(unsignedLong);
+          accountCheck = new AccountCheck(accountId);
+        }
+        catch(Exception e)
+        {
+          LOG.info("Claim failed by 'ADDRESS_RS_CONVERT', account: '" + accountId + "'.");
+          accountCheck = new AccountCheck(accountId, "Please enter your BURST 'Account ID' or 'Numeric Account ID'! '" + accountId + "' is not valid!");
+        }
+      }
+      else
+      {
+        // verify alphabet
+        for(char c : accountId.toCharArray())
+        {
+          if(!alphabet.contains(c))
+          {
+            LOG.info("Claim failed by 'ADDRESS_ALPHABET', malformed account: " + accountId);
+            accountCheck = new AccountCheck(accountId, "Please enter your BURST 'Account ID' or 'Numeric Account ID'! '" + accountId + "' is not valid!");
+          }
+        }
+
+        if(accountCheck == null)
+        {
+          accountCheck = new AccountCheck(accountId);
+        }
+      }
+    }
+    return accountCheck;
   }
 
   private Account getAccount(String accountId)
