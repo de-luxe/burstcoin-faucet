@@ -161,18 +161,22 @@ public class FaucetController
           {
             // get cookie lastClaim
             Long lastClaimCookie = null;
-            List<Cookie> cookies = Arrays.asList(request.getCookies());
-            for(Cookie cookie : cookies)
+            Cookie[] cookieArray = request.getCookies();
+            if(cookieArray != null)
             {
-              if(SECURE_COOKIE_NAME.equals(cookie.getName()))
+              List<Cookie> cookies = Arrays.asList(cookieArray);
+              for(Cookie cookie : cookies)
               {
-                try
+                if(SECURE_COOKIE_NAME.equals(cookie.getName()))
                 {
-                  lastClaimCookie = Long.valueOf(cookie.getValue());
-                }
-                catch(Exception e)
-                {
-                  lastClaimCookie = null;
+                  try
+                  {
+                    lastClaimCookie = Long.valueOf(cookie.getValue());
+                  }
+                  catch(Exception e)
+                  {
+                    lastClaimCookie = null;
+                  }
                 }
               }
             }
