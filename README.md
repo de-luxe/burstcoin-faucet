@@ -3,11 +3,13 @@ Faucet-Software for Burstcoin (BURST)
 
 Features:
 - Claim interval and amount adjustable
-- Abuse protected via recaptcha + account and IP-tracking
+- Abuse protected via recaptcha + account, IP and cookie-tracking
 - Simple stats about donations and claims
+- Multi-language support
 - Easy to run with included standalone tomcat server.
 
 Requirements:
+- Java8
 - recaptcha keys
 
 Setup:

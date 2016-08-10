@@ -87,6 +87,7 @@ public class BurstcoinFaucet
   public MessageSource messageSource()
   {
     ResourceBundleMessageSource resourceBundleMessageSource = new ResourceBundleMessageSource();
+    resourceBundleMessageSource.setDefaultEncoding("UTF-8");
     resourceBundleMessageSource.addBasenames("templates/index");
     return resourceBundleMessageSource;
   }
