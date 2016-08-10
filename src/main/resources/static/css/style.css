@@ -174,7 +174,7 @@ input {
 }
 
 #wrapper p.button input {
-  width: 130px;
+  width: auto;
   cursor: pointer;
   background: rgb(61, 157, 179);
   padding: 8px 5px;
@@ -393,35 +393,6 @@ p.faucet_link {
 #stats-wrapper label {
   color: rgb(64, 92, 96);
   position: relative;
-}
-
-#stats-wrapper p.button input {
-  width: 130px;
-  cursor: pointer;
-  background: rgb(61, 157, 179);
-  padding: 8px 5px;
-  font-family: 'BebasNeueRegular', 'Arial Narrow', Arial, sans-serif;
-  color: #fff;
-  font-size: 24px;
-  border: 1px solid rgb(28, 108, 122);
-  margin-bottom: 10px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-  -webkit-border-radius: 3px;
-  -moz-border-radius: 3px;
-  border-radius: 3px;
-  -webkit-box-shadow: 0 1px 6px 4px rgba(0, 0, 0, 0.07) inset,
-  0 0 0 3px rgb(254, 254, 254),
-  0 5px 3px 3px rgb(210, 210, 210);
-  -moz-box-shadow: 0 1px 6px 4px rgba(0, 0, 0, 0.07) inset,
-  0 0 0 3px rgb(254, 254, 254),
-  0 5px 3px 3px rgb(210, 210, 210);
-  box-shadow: 0 1px 6px 4px rgba(0, 0, 0, 0.07) inset,
-  0 0 0 3px rgb(254, 254, 254),
-  0 5px 3px 3px rgb(210, 210, 210);
-  -webkit-transition: all 0.2s linear;
-  -moz-transition: all 0.2s linear;
-  -o-transition: all 0.2s linear;
-  transition: all 0.2s linear;
 }
 
 .lt8 #stats-wrapper h1 {

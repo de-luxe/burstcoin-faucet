@@ -29,7 +29,9 @@ import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.MessageSource;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.support.ResourceBundleMessageSource;
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
@@ -79,6 +81,14 @@ public class BurstcoinFaucet
   public ObjectMapper objectMapper()
   {
     return new ObjectMapper();
+  }
+
+  @Bean
+  public MessageSource messageSource()
+  {
+    ResourceBundleMessageSource resourceBundleMessageSource = new ResourceBundleMessageSource();
+    resourceBundleMessageSource.addBasenames("templates/index");
+    return resourceBundleMessageSource;
   }
 
   public static void main(String[] args)

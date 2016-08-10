@@ -22,41 +22,73 @@
 
 package burstcoin.faucet.controller.bean;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
-public class Stats
+public class StatsData
 {
-  private String totalDonated;
-  private String totalClaimed;
+  private long totalClaims;
+  private long totalDonations;
+  private long othersDonations;
+  private Map<String, ClaimStat> claimLookup;
+  private Map<String, Long> donateLookup;
+  private Set<String> others;
 
-  private List<String> donations;
-  private List<String> claims;
-
-  public Stats(String totalDonated, String totalClaimed, List<String> donations, List<String> claims)
+  public StatsData()
   {
-    this.totalDonated = totalDonated;
-    this.totalClaimed = totalClaimed;
-    this.donations = donations;
-    this.claims = claims;
+    totalClaims = 0;
+    totalDonations = 0;
+    othersDonations = 0;
+
+    claimLookup = new HashMap<>();
+    donateLookup = new HashMap<>();
+    others = new HashSet<>();
   }
 
-  public String getTotalDonated()
+  public Set<String> getOthers()
   {
-    return totalDonated;
+    return others;
   }
 
-  public String getTotalClaimed()
+  public long getOthersDonations()
   {
-    return totalClaimed;
+    return othersDonations;
   }
 
-  public List<String> getDonations()
+  public Map<String, ClaimStat> getClaimLookup()
   {
-    return donations;
+    return claimLookup;
   }
 
-  public List<String> getClaims()
+  public Map<String, Long> getDonateLookup()
   {
-    return claims;
+    return donateLookup;
+  }
+
+  public long getTotalClaims()
+  {
+    return totalClaims;
+  }
+
+  public long getTotalDonations()
+  {
+    return totalDonations;
+  }
+
+  public void addToTotalClaims(Long claimAmount)
+  {
+    totalClaims += claimAmount;
+  }
+
+  public void addToTotalDonations(Long donationAmount)
+  {
+    totalDonations += donationAmount;
+  }
+
+  public void addToOtherDonations(Long otherDonationAmount)
+  {
+    othersDonations += otherDonationAmount;
   }
 }
