@@ -5,7 +5,7 @@ Features:
 - Claim interval and amount adjustable
 - Abuse protected via recaptcha + account, IP and cookie-tracking
 - Simple stats about donations and claims
-- Multi-language support
+- Multi-language support (en, de, fr, es, pt, pt_BR) PLEASE HELP AND PROVIDE ADDITIONAL TRANSLATIONS!
 - Easy to run with included standalone tomcat server.
 
 Requirements:
@@ -14,7 +14,7 @@ Requirements:
 
 Setup:
 - edit 'faucet.properties' (e.g. rename faucet.default.properties) 
-- execute 'java -jar burstcoin-faucet-0.3.1-SNAPSHOT.jar' or start via included run script.
+- execute 'java -jar burstcoin-faucet-0.3.2-RELEASE.jar' or start via included run script.
 
 
 
