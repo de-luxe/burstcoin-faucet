@@ -54,6 +54,8 @@ import javax.annotation.PostConstruct;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -167,7 +169,7 @@ public class FaucetController
       AccountCheck accountCheck = checkAccountId(accountId, locale);
       if(!accountCheck.isSuccess())
       {
-        return "redirect:/?error=" + accountCheck.getError();
+        return "redirect:/?error=" + urlEncode(accountCheck.getError());
       }
       else
       {
@@ -235,13 +237,13 @@ public class FaucetController
                 response.addCookie(lastClaim);
 
                 String[] parameters = {String.valueOf(BurstcoinFaucetProperties.getClaimAmount()), account.getAccountId()};
-                return "redirect:/?success=" + messageSource.getMessage("faucet.msg.send.money", parameters, locale);
+                return "redirect:/?success=" + urlEncode(messageSource.getMessage("faucet.msg.send.money", parameters, locale));
               }
               else
               {
                 LOG.info("Claim failed by 'WALLET_ACCESS', account '" + account.getAccountId() + "'.");
 
-                return "redirect:/?error=" + messageSource.getMessage("faucet.error.claim.walletAccess", null, locale);
+                return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.walletAccess", null, locale));
               }
             }
             else
@@ -249,7 +251,8 @@ public class FaucetController
               LOG.info("Claim denied by COOKIE, account '" + account.getAccountId() + "'.");
 
               long cookieTime = (lastClaimCookie + claimInterval) - new Date().getTime();
-              return "redirect:/?error=" + messageSource.getMessage("faucet.error.claim.denied.cookie", new Object[]{(cookieTime) / (60 * 1000)}, locale);
+              return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.cookie",
+                                                                              new Object[]{(cookieTime) / (60 * 1000)}, locale));
             }
           }
           else
@@ -257,7 +260,7 @@ public class FaucetController
             LOG.info("Claim denied by IP, account '" + account.getAccountId() + "'.");
 
             long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-            return "redirect:/?error=" + messageSource.getMessage("faucet.error.claim.denied.ip", new Object[]{(ipTime) / (60 * 1000)}, locale);
+            return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.ip", new Object[]{(ipTime) / (60 * 1000)}, locale));
           }
         }
         else
@@ -265,15 +268,28 @@ public class FaucetController
           LOG.info("Claim denied by ACCOUNT, account '" + account.getAccountId() + "'.");
 
           long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-          return "redirect:/?error=" + messageSource.getMessage("faucet.error.claim.denied.account", new Object[]{(accountTime) / (60 * 1000)}, locale);
+          return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.account",
+                                                                          new Object[]{(accountTime) / (60 * 1000)}, locale));
         }
       }
     }
     else
     {
       LOG.info("Claim failed by 'RECAPTCHA', account '" + accountId + "'.");
+      return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.reCaptcha", null, locale));
+    }
+  }
 
-      return "redirect:/?error=" + messageSource.getMessage("faucet.error.claim.reCaptcha", null, locale);
+  private String urlEncode(String text)
+  {
+    try
+    {
+      return URLEncoder.encode(text, "UTF-8");
+    }
+    catch(UnsupportedEncodingException e)
+    {
+      LOG.error("Could not URL encode: " + text);
+      return text;
     }
   }
 
@@ -333,7 +349,7 @@ public class FaucetController
     {
       return accountIdInput;
     }
-    return accountIdInput.substring(0, accountIdInput.length() / 2) + ".(obfuscated)...";
+    return accountIdInput.substring(0, accountIdInput.length() / 2) + "...obfuscated...";
   }
 
   private Account getAccount(String accountId)
