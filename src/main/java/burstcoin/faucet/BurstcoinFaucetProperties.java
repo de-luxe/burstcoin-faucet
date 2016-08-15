@@ -51,6 +51,7 @@ public class BurstcoinFaucetProperties
   private static String serverPort;
   private static String privateKey;
   private static String publicKey;
+  private static String analyticsCode;
 
   private static Integer claimInterval;
   private static Integer claimAmount;
@@ -82,6 +83,15 @@ public class BurstcoinFaucetProperties
       privateKey = asString("burstcoin.faucet.recaptcha.privateKey", "6LfEQRETAAAAABu9BQBb7NjRoRkYBUG8wu50cSQ5");
     }
     return privateKey;
+  }
+
+  public static String getAnalyticsCode()
+  {
+    if(analyticsCode == null)
+    {
+      analyticsCode = asString("burstcoin.faucet.analytics", null);
+    }
+    return analyticsCode;
   }
 
   public static String getPublicKey()

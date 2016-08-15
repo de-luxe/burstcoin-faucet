@@ -24,6 +24,7 @@ package burstcoin.faucet.network;
 
 import burstcoin.faucet.BurstcoinFaucetProperties;
 import burstcoin.faucet.network.model.Balance;
+import burstcoin.faucet.network.model.MiningInfo;
 import burstcoin.faucet.network.model.SendMoneyResponse;
 import burstcoin.faucet.network.model.Transaction;
 import burstcoin.faucet.network.model.Transactions;
@@ -42,6 +43,7 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Component
 public class NetworkComponent
@@ -155,5 +157,29 @@ public class NetworkComponent
       LOG.warn("Error: Failed to 'getBalance' for accountId '" + accountId + "' : " + e.getMessage(), e);
     }
     return balance;
+  }
+
+  public MiningInfo getMiningInfo()
+  {
+    MiningInfo result = null;
+    try
+    {
+      ContentResponse response;
+      response = httpClient.newRequest(BurstcoinFaucetProperties.getWalletServer() + "/burst?requestType=getMiningInfo")
+        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
+        .send();
+
+      result = objectMapper.readValue(response.getContentAsString(), MiningInfo.class);
+    }
+    catch(TimeoutException timeoutException)
+    {
+      LOG.warn("Unable to get mining info caused by connectionTimeout, currently '" + (connectionTimeout / 1000)
+               + " sec.' try increasing it!");
+    }
+    catch(Exception e)
+    {
+      LOG.trace("Unable to get mining info from wallet: " + e.getMessage());
+    }
+    return result;
   }
 }

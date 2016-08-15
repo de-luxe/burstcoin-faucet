@@ -32,6 +32,7 @@ import burstcoin.faucet.data.IPAddress;
 import burstcoin.faucet.data.IPAddressRepository;
 import burstcoin.faucet.network.NetworkComponent;
 import burstcoin.faucet.network.model.Balance;
+import burstcoin.faucet.network.model.MiningInfo;
 import burstcoin.faucet.network.model.SendMoneyResponse;
 import burstcoin.faucet.network.model.Transaction;
 import com.github.mkopylec.recaptcha.validation.RecaptchaValidator;
@@ -49,6 +50,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 
 import javax.annotation.PostConstruct;
 import javax.servlet.http.Cookie;
@@ -108,14 +110,25 @@ public class FaucetController
     faucetAccountRS = "BURST-" + ReedSolomon.encode(faucetAccountId);
   }
 
+  @RequestMapping(value = "/burst", produces = "application/json")
+  @ResponseBody
+  public MiningInfo burst(@RequestParam("requestType") String requestType)
+  {
+    if("getMiningInfo".equals(requestType))
+    {
+      return networkComponent.getMiningInfo();
+    }
+    return null;
+  }
+
   @RequestMapping("/")
   public String index(HttpServletRequest request, Model model)
   {
     Locale locale = request.getLocale();
     Balance balance = networkComponent.getBalance(numericFaucetAccountId);
 
-
     model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
+    model.addAttribute("analyticsCode", BurstcoinFaucetProperties.getAnalyticsCode());
 
     if(stats == null || lastStatsDataUpdate == null || lastStatsDataUpdate.getTime() < new Date().getTime() - (1000 * 60 * 5 /* 5 minutes */))
     {
