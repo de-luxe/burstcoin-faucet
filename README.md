@@ -5,8 +5,11 @@ Features:
 - Claim interval and amount adjustable
 - Abuse protected via recaptcha + account, IP and cookie-tracking
 - Simple stats about donations and claims
-- Multi-language support (en, de, fr, es, pt, pt_BR) PLEASE HELP AND PROVIDE ADDITIONAL TRANSLATIONS!
+- Multi-language support (en, de, fr, es, pt, pt_BR, nb, nn, ru, tl, tr) 
+  PLEASE HELP AND PROVIDE ADDITIONAL TRANSLATIONS!
 - Easy to run with included standalone tomcat server.
+- Supports '/burst?requestType=getMiningInfo' for monitoring faucet wallet
+- Optional Google Analytics support
 
 Requirements:
 - Java8
@@ -14,7 +17,7 @@ Requirements:
 
 Setup:
 - edit 'faucet.properties' (e.g. rename faucet.default.properties) 
-- execute 'java -jar burstcoin-faucet-0.3.2-RELEASE.jar' or start via included run script.
+- execute 'java -jar burstcoin-faucet-0.3.3-RELEASE.jar' or start via included run script.
 
 
 
