@@ -62,6 +62,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -391,8 +392,29 @@ public class FaucetController
 
   private StatsData getStatsData(String accountId)
   {
-    Map<String, Transaction> transactions = networkComponent.getTransactions(accountId);
+    Map<String, Transaction> transactions = new HashMap<>();
+    boolean hasMoreTransactions = true;
+    int offset = 0;
+    int transactionsPerRequest = 1999;
+    while(hasMoreTransactions)
+    {
+      Map<String, Transaction> temp = networkComponent.getTransactions(accountId, offset, transactionsPerRequest);
+      if(temp != null && !temp.isEmpty())
+      {
+        hasMoreTransactions = temp.size() >= transactionsPerRequest;
+        transactions.putAll(temp);
+        offset += transactionsPerRequest;
+      }
+      else
+      {
+        LOG.warn("Failed to get Transactions ...");
+      }
+    }
+    return generateStatsData(accountId, transactions);
+  }
 
+  private StatsData generateStatsData(String accountId, Map<String, Transaction> transactions)
+  {
     StatsData data = new StatsData();
 
     for(Transaction transaction : transactions.values())
@@ -449,7 +471,6 @@ public class FaucetController
     {
       data.getDonateLookup().remove(other);
     }
-
     return data;
   }
 

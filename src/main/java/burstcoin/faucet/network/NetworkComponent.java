@@ -90,7 +90,7 @@ public class NetworkComponent
     return sendMoneyResponse;
   }
 
-  public Map<String, Transaction> getTransactions(String accountId)
+  public Map<String, Transaction> getTransactions(String accountId, int offset, int transactionsPerRequest)
   {
     Map<String, Transaction> transactionLookup = null;
     try
@@ -99,6 +99,8 @@ public class NetworkComponent
 
       Request request = httpClient.POST(BURST_API_URL)
         .param("requestType", "getAccountTransactions")
+        .param("firstIndex", String.valueOf(offset))
+        .param("lastIndex", String.valueOf(offset + transactionsPerRequest))
         .param("account", accountId);
       request.send(listener);
 
