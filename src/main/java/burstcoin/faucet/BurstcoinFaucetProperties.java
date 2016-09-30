@@ -22,6 +22,8 @@
 
 package burstcoin.faucet;
 
+import nxt.crypto.Crypto;
+import nxt.util.Convert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
@@ -34,6 +36,7 @@ public class BurstcoinFaucetProperties
 {
   private static final Logger LOG = LoggerFactory.getLogger(BurstcoinFaucetProperties.class);
   private static final Properties PROPS = new Properties();
+
   static
   {
     try
@@ -52,10 +55,14 @@ public class BurstcoinFaucetProperties
   private static String privateKey;
   private static String publicKey;
   private static String analyticsCode;
+  private static String numericFaucetAccountId;
 
+  private static Integer minDonationAmount;
   private static Integer claimInterval;
   private static Integer claimAmount;
   private static Integer fee;
+  private static Integer connectionTimeout;
+  private static Integer statsUpdateInterval;
 
 
   public static String getServerPort()
@@ -116,18 +123,61 @@ public class BurstcoinFaucetProperties
     return passPhrase; // we deliver "noPassPhrase", should find no plots!
   }
 
+  public static String getNumericFaucetAccountId()
+  {
+    if(numericFaucetAccountId == null)
+    {
+      String passPhrase = getPassPhrase();
+      if(passPhrase != null)
+      {
+        byte[] publicKey = Crypto.getPublicKey(passPhrase);
+        byte[] publicKeyHash = Crypto.sha256().digest(publicKey);
+        long faucetAccountId = Convert.fullHashToId(publicKeyHash);
+        numericFaucetAccountId = Convert.toUnsignedLong(faucetAccountId);
+      }
+    }
+    return numericFaucetAccountId;
+  }
+
   public static int getClaimInterval()
   {
-    if(claimInterval  == null)
+    if(claimInterval == null)
     {
       claimInterval = asInteger("burstcoin.faucet.claimInterval", 3);
     }
     return claimInterval;
   }
 
+  public static int getConnectionTimeout()
+  {
+    if(connectionTimeout == null)
+    {
+      connectionTimeout = asInteger("burstcoin.faucet.connectionTimeout", 30000);
+    }
+    return connectionTimeout;
+  }
+
+  public static int getStatsUpdateInterval()
+  {
+    if(statsUpdateInterval == null)
+    {
+      statsUpdateInterval = asInteger("burstcoin.faucet.statsUpdateInterval", 1000 * 60 * 10);
+    }
+    return statsUpdateInterval;
+  }
+
+  public static int getMinDonationAmount()
+  {
+    if(minDonationAmount == null)
+    {
+      minDonationAmount = asInteger("burstcoin.faucet.minDonationListed", 10);
+    }
+    return minDonationAmount;
+  }
+
   public static int getClaimAmount()
   {
-    if(claimAmount  == null)
+    if(claimAmount == null)
     {
       claimAmount = asInteger("burstcoin.faucet.claimAmount", 3);
     }

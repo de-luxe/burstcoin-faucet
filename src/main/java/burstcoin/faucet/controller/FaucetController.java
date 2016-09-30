@@ -34,15 +34,14 @@ import burstcoin.faucet.network.NetworkComponent;
 import burstcoin.faucet.network.model.Balance;
 import burstcoin.faucet.network.model.MiningInfo;
 import burstcoin.faucet.network.model.SendMoneyResponse;
-import burstcoin.faucet.network.model.Transaction;
 import com.github.mkopylec.recaptcha.validation.RecaptchaValidator;
-import nxt.crypto.Crypto;
 import nxt.crypto.ReedSolomon;
 import nxt.util.Convert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
@@ -52,7 +51,6 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
-import javax.annotation.PostConstruct;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -62,7 +60,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -76,39 +73,37 @@ public class FaucetController
   private static final String SECURE_COOKIE_NAME = "lc";
   private static Log LOG = LogFactory.getLog(FaucetController.class);
 
-  @Autowired
-  private RecaptchaValidator recaptchaValidator;
+  private final RecaptchaValidator recaptchaValidator;
+  private final AccountRepository accountRepository;
+  private final IPAddressRepository ipAddressRepository;
+  private final NetworkComponent networkComponent;
+  private final MessageSource messageSource;
 
-  @Autowired
-  private AccountRepository accountRepository;
-
-  @Autowired
-  private IPAddressRepository ipAddressRepository;
-
-  @Autowired
-  private NetworkComponent networkComponent;
-
-  @Autowired
-  private MessageSource messageSource;
-
-  private String numericFaucetAccountId;
   private String faucetAccountRS;
   private Set<Character> alphabet;
   private StatsData stats;
-  private Date lastStatsDataUpdate;
 
-  @PostConstruct
-  private void init()
+  @Autowired
+  public FaucetController(AccountRepository accountRepository, NetworkComponent networkComponent, RecaptchaValidator recaptchaValidator,
+                          MessageSource messageSource, IPAddressRepository ipAddressRepository)
   {
+    this.accountRepository = accountRepository;
+    this.networkComponent = networkComponent;
+    this.recaptchaValidator = recaptchaValidator;
+    this.messageSource = messageSource;
+    this.ipAddressRepository = ipAddressRepository;
+
     alphabet = new HashSet<>(
       Arrays.asList('2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S',
                     'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '-'));
 
-    byte[] publicKey = Crypto.getPublicKey(BurstcoinFaucetProperties.getPassPhrase());
-    byte[] publicKeyHash = Crypto.sha256().digest(publicKey);
-    long faucetAccountId = Convert.fullHashToId(publicKeyHash);
-    numericFaucetAccountId = Convert.toUnsignedLong(faucetAccountId);
-    faucetAccountRS = "BURST-" + ReedSolomon.encode(faucetAccountId);
+    faucetAccountRS = "BURST-" + ReedSolomon.encode(Convert.parseUnsignedLong(BurstcoinFaucetProperties.getNumericFaucetAccountId()));
+  }
+
+  @EventListener
+  public void handleUpdatedStats(StatsData statsData)
+  {
+    this.stats = statsData;
   }
 
   @RequestMapping(value = "/burst", produces = "application/json")
@@ -125,49 +120,51 @@ public class FaucetController
   @RequestMapping("/")
   public String index(HttpServletRequest request, Model model)
   {
-    Locale locale = request.getLocale();
-    Balance balance = networkComponent.getBalance(numericFaucetAccountId);
-
-    model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
-    model.addAttribute("analyticsCode", BurstcoinFaucetProperties.getAnalyticsCode());
-
-    if(stats == null || lastStatsDataUpdate == null || lastStatsDataUpdate.getTime() < new Date().getTime() - (1000 * 60 * 5 /* 5 minutes */))
+    if(stats != null)
     {
-      stats = getStatsData(numericFaucetAccountId);
-      lastStatsDataUpdate = new Date();
-    }
+      Locale locale = request.getLocale();
+      Balance balance = networkComponent.getBalance(BurstcoinFaucetProperties.getNumericFaucetAccountId());
 
-    List<String> donations = new ArrayList<>();
-    for(Map.Entry<String, Long> donateEntry : stats.getDonateLookup().entrySet())
+      model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
+      model.addAttribute("analyticsCode", BurstcoinFaucetProperties.getAnalyticsCode());
+
+      List<String> donations = new ArrayList<>();
+      for(Map.Entry<String, Long> donateEntry : stats.getDonateLookup().entrySet())
+      {
+        donations.add(messageSource.getMessage("faucet.stats.donations.account",
+                                               new Object[]{donateEntry.getKey(), cleanAmount(donateEntry.getValue())}, locale));
+      }
+      donations.add(messageSource.getMessage("faucet.stats.donations.other", new Object[]{cleanAmount(stats.getOthersDonations())}, locale));
+
+      // no lookup needed anymore, add to list an sort
+      List<ClaimStat> claimStats = new ArrayList<>(stats.getClaimLookup().values());
+      Collections.sort(claimStats);
+      List<String> claims = new ArrayList<>(claimStats.size());
+      for(ClaimStat claimStat : claimStats)
+      {
+        claims.add(messageSource.getMessage("faucet.stats.claims.account",
+                                            new Object[]{claimStat.getNumberOfClaims(), claimStat.getAccountRS(), cleanAmount(claimStat.getClaimed())},
+                                            locale));
+      }
+
+      model.addAttribute("totalClaimed", messageSource.getMessage("faucet.stats.claims.summary",
+                                                                  new Object[]{cleanAmount(stats.getTotalClaims()), claims.size()}, locale));
+      model.addAttribute("totalDonated", messageSource.getMessage("faucet.stats.donations.summary",
+                                                                  new Object[]{cleanAmount(stats.getTotalDonations()),
+                                                                               stats.getDonateLookup().size() + stats.getOthers().size()}, locale));
+      model.addAttribute("donations", donations);
+      model.addAttribute("claims", claims);
+
+      model.addAttribute("linkUrl", messageSource.getMessage("faucet.link.url", null, locale));
+      model.addAttribute("linkText", messageSource.getMessage("faucet.link.text", new Object[]{faucetAccountRS,
+                                                                                               cleanAmount(Long.valueOf(balance.getUnconfirmedBalanceNQT()))},
+                                                              locale));
+      return "index";
+    }
+    else
     {
-      donations.add(messageSource.getMessage("faucet.stats.donations.account",
-                                             new Object[]{donateEntry.getKey(), cleanAmount(donateEntry.getValue())}, locale));
+      return "init";
     }
-    donations.add(messageSource.getMessage("faucet.stats.donations.other", new Object[]{cleanAmount(stats.getOthersDonations())}, locale));
-
-    // no lookup needed anymore, add to list an sort
-    List<ClaimStat> claimStats = new ArrayList<>(stats.getClaimLookup().values());
-    Collections.sort(claimStats);
-    List<String> claims = new ArrayList<>(claimStats.size());
-    for(ClaimStat claimStat : claimStats)
-    {
-      claims.add(messageSource.getMessage("faucet.stats.claims.account",
-                                          new Object[]{claimStat.getNumberOfClaims(), claimStat.getAccountRS(), cleanAmount(claimStat.getClaimed())}, locale));
-    }
-
-    model.addAttribute("totalClaimed", messageSource.getMessage("faucet.stats.claims.summary",
-                                                                new Object[]{cleanAmount(stats.getTotalClaims()), claims.size()}, locale));
-    model.addAttribute("totalDonated", messageSource.getMessage("faucet.stats.donations.summary",
-                                                                new Object[]{cleanAmount(stats.getTotalDonations()),
-                                                                             stats.getDonateLookup().size() + stats.getOthers().size()}, locale));
-    model.addAttribute("donations", donations);
-    model.addAttribute("claims", claims);
-
-    model.addAttribute("linkUrl", messageSource.getMessage("faucet.link.url", null, locale));
-    model.addAttribute("linkText", messageSource.getMessage("faucet.link.text", new Object[]{faucetAccountRS,
-                                                                                             cleanAmount(Long.valueOf(balance.getUnconfirmedBalanceNQT()))},
-                                                            locale));
-    return "index";
   }
 
   @RequestMapping(value = "/", method = RequestMethod.POST)
@@ -388,90 +385,6 @@ public class FaucetController
       ipAddressRepository.save(ipAddress);
     }
     return ipAddress;
-  }
-
-  private StatsData getStatsData(String accountId)
-  {
-    Map<String, Transaction> transactions = new HashMap<>();
-    boolean hasMoreTransactions = true;
-    int offset = 0;
-    int transactionsPerRequest = 1999;
-    while(hasMoreTransactions)
-    {
-      Map<String, Transaction> temp = networkComponent.getTransactions(accountId, offset, transactionsPerRequest);
-      if(temp != null && !temp.isEmpty())
-      {
-        hasMoreTransactions = temp.size() >= transactionsPerRequest;
-        transactions.putAll(temp);
-        offset += transactionsPerRequest;
-      }
-      else
-      {
-        LOG.warn("Failed to get Transactions ...");
-      }
-    }
-    return generateStatsData(accountId, transactions);
-  }
-
-  private StatsData generateStatsData(String accountId, Map<String, Transaction> transactions)
-  {
-    StatsData data = new StatsData();
-
-    for(Transaction transaction : transactions.values())
-    {
-      if(accountId.equals(transaction.getSender()))
-      {
-        if(transaction.getRecipientRS() != null)
-        {
-          data.addToTotalClaims(Long.valueOf(transaction.getAmountNQT()));
-
-          ClaimStat claimStat = data.getClaimLookup().get(transaction.getRecipientRS());
-          if(claimStat == null)
-          {
-            claimStat = new ClaimStat(transaction.getTimestamp(), Long.valueOf(transaction.getAmountNQT()), 1, transaction.getRecipientRS());
-          }
-          else
-          {
-            // update claim amount
-            Long accountClaims = claimStat.getClaimed();
-            accountClaims = accountClaims + Long.valueOf(transaction.getAmountNQT());
-            claimStat.setClaimed(accountClaims);
-            // update timestamp
-            if(claimStat.getLastClaimTimestamp() < transaction.getTimestamp())
-            {
-              claimStat.setLastClaimTimestamp(transaction.getTimestamp());
-            }
-            // update number
-            claimStat.setNumberOfClaims(1 + claimStat.getNumberOfClaims());
-          }
-          data.getClaimLookup().put(transaction.getRecipientRS(), claimStat);
-        }
-      }
-      else
-      {
-        data.addToTotalDonations(Long.valueOf(transaction.getAmountNQT()));
-        Long accountDonations = data.getDonateLookup().get(transaction.getSenderRS());
-        accountDonations = accountDonations == null ? Long.valueOf(transaction.getAmountNQT()) : accountDonations + Long.valueOf(transaction.getAmountNQT());
-        data.getDonateLookup().put(transaction.getSenderRS(), accountDonations);
-      }
-    }
-
-    // cleanup
-    for(Map.Entry<String, Long> donateEntry : data.getDonateLookup().entrySet())
-    {
-      // todo make adjustable via setting
-      if(donateEntry.getValue() < 1000000000) // add donate accounts with less than 10 BURST to others
-      {
-        data.addToOtherDonations(donateEntry.getValue());
-        data.getOthers().add(donateEntry.getKey());
-      }
-    }
-
-    for(String other : data.getOthers())
-    {
-      data.getDonateLookup().remove(other);
-    }
-    return data;
   }
 
   private long cleanAmount(Long amount)

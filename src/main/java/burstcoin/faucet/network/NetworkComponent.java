@@ -26,6 +26,7 @@ import burstcoin.faucet.BurstcoinFaucetProperties;
 import burstcoin.faucet.network.model.Balance;
 import burstcoin.faucet.network.model.MiningInfo;
 import burstcoin.faucet.network.model.SendMoneyResponse;
+import burstcoin.faucet.network.model.Timestamp;
 import burstcoin.faucet.network.model.Transaction;
 import burstcoin.faucet.network.model.Transactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -50,13 +51,16 @@ public class NetworkComponent
 {
   private static final String BURST_API_URL = BurstcoinFaucetProperties.getWalletServer() + "/burst";
   private static Log LOG = LogFactory.getLog(NetworkComponent.class);
-  private static final int connectionTimeout = 16000;
 
-  @Autowired
   private ObjectMapper objectMapper;
+  private HttpClient httpClient;
 
   @Autowired
-  private HttpClient httpClient;
+  public NetworkComponent(HttpClient httpClient, ObjectMapper objectMapper)
+  {
+    this.httpClient = httpClient;
+    this.objectMapper = objectMapper;
+  }
 
   public SendMoneyResponse sendMoney(int amount, String recipientId, String secretPhrase)
   {
@@ -70,7 +74,7 @@ public class NetworkComponent
         .param("feeNQT", BurstcoinFaucetProperties.getFee() + "00000000")
         .param("deadline", "1000")
         .param("secretPhrase", secretPhrase)
-        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
+        .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
         .send();
 
       if(!response.getContentAsString().contains("errorDescription"))
@@ -104,31 +108,60 @@ public class NetworkComponent
         .param("account", accountId);
       request.send(listener);
 
-      Response response = listener.get(connectionTimeout, TimeUnit.MILLISECONDS);
-
-      // Look at the response
-      if(response.getStatus() == 200)
-      {
-        // Use try-with-resources to close input stream.
-        try (InputStream responseContent = listener.getInputStream())
-        {
-          Transactions transactions = objectMapper.readValue(responseContent, Transactions.class);
-          LOG.info("received '" + transactions.getTransactions().size() + "' transactions in '" + transactions.getRequestProcessingTime() + "' ms");
-          transactionLookup = new HashMap<>();
-          for(Transaction transaction : transactions.getTransactions())
-          {
-            transactionLookup.put(transaction.getTransaction(), transaction);
-          }
-        }
-        catch(Exception e)
-        {
-          LOG.error("Failed to receive faucet account transactions.");
-        }
-      }
+      Response response = listener.get(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS);
+      transactionLookup = handleGetTransactionsResponse(listener, response);
     }
     catch(Exception e)
     {
       LOG.warn("Error: Failed to 'getAccountTransactions' for accountId '" + accountId + "' : " + e.getMessage());
+    }
+    return transactionLookup;
+  }
+
+  public Map<String, Transaction> getTransactions(String accountId, int timestamp)
+  {
+    Map<String, Transaction> transactionLookup = null;
+    try
+    {
+      InputStreamResponseListener listener = new InputStreamResponseListener();
+
+      Request request = httpClient.POST(BURST_API_URL)
+        .param("requestType", "getAccountTransactions")
+        .param("timestamp", String.valueOf(timestamp))
+        .param("account", accountId);
+      request.send(listener);
+
+      Response response = listener.get(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS);
+      transactionLookup = handleGetTransactionsResponse(listener, response);
+    }
+    catch(Exception e)
+    {
+      LOG.warn("Error: Failed to 'getAccountTransactions' for accountId '" + accountId + "' : " + e.getMessage());
+    }
+    return transactionLookup;
+  }
+
+  private Map<String, Transaction> handleGetTransactionsResponse(InputStreamResponseListener listener, Response response)
+  {
+    Map<String, Transaction> transactionLookup = new HashMap<>();
+    // Look at the response
+    if(response.getStatus() == 200)
+    {
+      // Use try-with-resources to close input stream.
+      try (InputStream responseContent = listener.getInputStream())
+      {
+        Transactions transactions = objectMapper.readValue(responseContent, Transactions.class);
+        LOG.info("received '" + transactions.getTransactions().size() + "' transactions in '" + transactions.getRequestProcessingTime() + "' ms");
+        transactionLookup = new HashMap<>();
+        for(Transaction transaction : transactions.getTransactions())
+        {
+          transactionLookup.put(transaction.getTransaction(), transaction);
+        }
+      }
+      catch(Exception e)
+      {
+        LOG.error("Failed to receive faucet account transactions.", e);
+      }
     }
     return transactionLookup;
   }
@@ -138,10 +171,8 @@ public class NetworkComponent
     Balance balance = null;
     try
     {
-      ContentResponse response = httpClient.POST(BurstcoinFaucetProperties.getWalletServer() + "/burst")
-        .param("requestType", "getBalance")
-        .param("account", accountId)
-        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
+      ContentResponse response = httpClient.POST(BurstcoinFaucetProperties.getWalletServer() + "/burst?requestType=getBalance&account=" + accountId)
+        .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
         .send();
 
       if(!response.getContentAsString().contains("errorDescription"))
@@ -161,6 +192,32 @@ public class NetworkComponent
     return balance;
   }
 
+  public Timestamp getTime()
+  {
+    Timestamp timestamp = null;
+    try
+    {
+      ContentResponse response = httpClient.POST(BurstcoinFaucetProperties.getWalletServer() + "/burst?requestType=getTime")
+        .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
+        .send();
+
+      if(!response.getContentAsString().contains("errorDescription"))
+      {
+        timestamp = objectMapper.readValue(response.getContentAsString(), Timestamp.class);
+        LOG.info("received timestamp: '" + timestamp.getTime() + "' in '" + timestamp.getRequestProcessingTime() + "' ms");
+      }
+      else
+      {
+        LOG.error("Error: " + response.getContentAsString());
+      }
+    }
+    catch(Exception e)
+    {
+      LOG.warn("Error: Failed to 'getTime':" + e.getMessage(), e);
+    }
+    return timestamp;
+  }
+
   public MiningInfo getMiningInfo()
   {
     MiningInfo result = null;
@@ -168,14 +225,14 @@ public class NetworkComponent
     {
       ContentResponse response;
       response = httpClient.newRequest(BurstcoinFaucetProperties.getWalletServer() + "/burst?requestType=getMiningInfo")
-        .timeout(connectionTimeout, TimeUnit.MILLISECONDS)
+        .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
         .send();
 
       result = objectMapper.readValue(response.getContentAsString(), MiningInfo.class);
     }
     catch(TimeoutException timeoutException)
     {
-      LOG.warn("Unable to get mining info caused by connectionTimeout, currently '" + (connectionTimeout / 1000)
+      LOG.warn("Unable to get mining info caused by connectionTimeout, currently '" + (BurstcoinFaucetProperties.getConnectionTimeout() / 1000)
                + " sec.' try increasing it!");
     }
     catch(Exception e)
