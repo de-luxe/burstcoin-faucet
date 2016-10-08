@@ -173,7 +173,7 @@ class StatsService
     }
 
     // cleanup
-    Integer minDonationAmount = Integer.valueOf(BurstcoinFaucetProperties.getMinDonationAmount() + "00000000");
+    Long minDonationAmount = Long.valueOf(BurstcoinFaucetProperties.getMinDonationAmount() + "00000000");
     for(Map.Entry<String, Long> donateEntry : data.getDonateLookup().entrySet())
     {
       if(donateEntry.getValue() < minDonationAmount)
