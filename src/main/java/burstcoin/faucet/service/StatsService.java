@@ -23,6 +23,7 @@
 package burstcoin.faucet.service;
 
 import burstcoin.faucet.BurstcoinFaucetProperties;
+import burstcoin.faucet.controller.FaucetController;
 import burstcoin.faucet.controller.bean.ClaimStat;
 import burstcoin.faucet.controller.bean.StatsData;
 import burstcoin.faucet.network.NetworkComponent;
@@ -30,8 +31,8 @@ import burstcoin.faucet.network.model.Timestamp;
 import burstcoin.faucet.network.model.Transaction;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
@@ -46,17 +47,18 @@ class StatsService
   private static Log LOG = LogFactory.getLog(StatsService.class);
 
   private final NetworkComponent networkComponent;
-  private final ApplicationEventPublisher publisher;
+
+  private BeanFactory beanFactory;
 
   private Timer timer;
   private Timestamp lastUpdateTimestamp;
   private Map<String, Transaction> transactions;
 
   @Autowired
-  public StatsService(NetworkComponent networkComponent, ApplicationEventPublisher publisher)
+  public StatsService(NetworkComponent networkComponent, BeanFactory beanFactory)
   {
     this.networkComponent = networkComponent;
-    this.publisher = publisher;
+    this.beanFactory = beanFactory;
 
     transactions = new HashMap<>();
     timer = new Timer();
@@ -98,7 +100,8 @@ class StatsService
               }
               else
               {
-                LOG.warn("Failed to get Transactions ...");
+                LOG.warn("Failed to get Transactions ... maybe new account or network/wallet issue.");
+                hasMoreTransactions = false;
               }
             }
           }
@@ -109,12 +112,11 @@ class StatsService
             transactions.putAll(temp);
           }
 
-          // recalculate stats if number of transactions has changed
-          if(numberOfTransactionsBeforeUpdate < transactions.size())
+          // recalculate stats if number of transactions has changed, or there are no transactions
+          if(numberOfTransactionsBeforeUpdate < transactions.size() || transactions.size() == 0)
           {
             LOG.info("Updating stats with " + (transactions.size() - numberOfTransactionsBeforeUpdate) + " new transactions ...");
-
-            publisher.publishEvent(generateStatsData(BurstcoinFaucetProperties.getNumericFaucetAccountId(), transactions));
+            beanFactory.getBean(FaucetController.class).handleUpdatedStats(generateStatsData(BurstcoinFaucetProperties.getNumericFaucetAccountId(), transactions));
           }
           else
           {

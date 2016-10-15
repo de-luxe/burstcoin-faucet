@@ -41,7 +41,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
@@ -100,7 +99,6 @@ public class FaucetController
     faucetAccountRS = "BURST-" + ReedSolomon.encode(Convert.parseUnsignedLong(BurstcoinFaucetProperties.getNumericFaucetAccountId()));
   }
 
-  @EventListener
   public void handleUpdatedStats(StatsData statsData)
   {
     this.stats = statsData;
@@ -156,9 +154,8 @@ public class FaucetController
       model.addAttribute("claims", claims);
 
       model.addAttribute("linkUrl", messageSource.getMessage("faucet.link.url", null, locale));
-      model.addAttribute("linkText", messageSource.getMessage("faucet.link.text", new Object[]{faucetAccountRS,
-                                                                                               cleanAmount(Long.valueOf(balance.getUnconfirmedBalanceNQT()))},
-                                                              locale));
+      long cleanAmount = cleanAmount(Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0"));
+      model.addAttribute("linkText", messageSource.getMessage("faucet.link.text", new Object[]{faucetAccountRS, cleanAmount}, locale));
       return "index";
     }
     else
