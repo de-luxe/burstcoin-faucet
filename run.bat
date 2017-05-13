@@ -1,1 +1,1 @@
-java -jar burstcoin-faucet-0.3.5-SNAPSHOT.jar
+java -jar burstcoin-faucet-0.3.6-RELEASE.jar
