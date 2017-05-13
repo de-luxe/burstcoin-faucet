@@ -64,6 +64,8 @@ public class BurstcoinFaucetProperties
   private static Integer connectionTimeout;
   private static Integer statsUpdateInterval;
 
+  private static Integer maxClaimsPerAccount;
+
 
   public static String getServerPort()
   {
@@ -139,11 +141,20 @@ public class BurstcoinFaucetProperties
     return numericFaucetAccountId;
   }
 
+  public static Integer getMaxClaimsPerAccount()
+  {
+    if(maxClaimsPerAccount == null)
+    {
+      maxClaimsPerAccount = asInteger("burstcoin.faucet.maxClaimsPerAccount", null);
+    }
+    return maxClaimsPerAccount;
+  }
+
   public static int getClaimInterval()
   {
     if(claimInterval == null)
     {
-      claimInterval = asInteger("burstcoin.faucet.claimInterval", 3);
+      claimInterval = asInteger("burstcoin.faucet.claimInterval", 2);
     }
     return claimInterval;
   }
@@ -193,8 +204,7 @@ public class BurstcoinFaucetProperties
     return fee;
   }
 
-
-  private static int asInteger(String key, int defaultValue)
+  private static Integer asInteger(String key, Integer defaultValue)
   {
     String integerProperty = PROPS.containsKey(key) ? String.valueOf(PROPS.getProperty(key)) : null;
     Integer value = null;

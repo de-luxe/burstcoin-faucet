@@ -36,6 +36,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
@@ -91,7 +92,7 @@ class StatsService
             while(hasMoreTransactions)
             {
               Map<String, Transaction> temp = networkComponent
-                .getTransactions(BurstcoinFaucetProperties.getNumericFaucetAccountId(), offset, transactionsPerRequest);
+                .getTransactions(BurstcoinFaucetProperties.getNumericFaucetAccountId(), offset, transactionsPerRequest, false);
               if(temp != null && !temp.isEmpty())
               {
                 hasMoreTransactions = temp.size() >= transactionsPerRequest;
@@ -108,7 +109,7 @@ class StatsService
           else
           {
             // get transaction from specific timestamp
-            Map<String, Transaction> temp = networkComponent.getTransactions(BurstcoinFaucetProperties.getNumericFaucetAccountId(), updateFromTimestamp);
+            Map<String, Transaction> temp = networkComponent.getTransactions(BurstcoinFaucetProperties.getNumericFaucetAccountId(), updateFromTimestamp, false);
             transactions.putAll(temp);
           }
 
@@ -128,7 +129,7 @@ class StatsService
           LOG.error("Failed update stats data: ", e);
         }
       }
-    }, 200, BurstcoinFaucetProperties.getStatsUpdateInterval());
+    }, 10000, BurstcoinFaucetProperties.getStatsUpdateInterval());
   }
 
   private static StatsData generateStatsData(String accountId, Map<String, Transaction> transactions)
@@ -175,10 +176,10 @@ class StatsService
     }
 
     // cleanup
-    Long minDonationAmount = Long.valueOf(BurstcoinFaucetProperties.getMinDonationAmount() + "00000000");
+    BigInteger minDonationAmount = new BigInteger(BurstcoinFaucetProperties.getMinDonationAmount() + "00000000");
     for(Map.Entry<String, Long> donateEntry : data.getDonateLookup().entrySet())
     {
-      if(donateEntry.getValue() < minDonationAmount)
+      if(minDonationAmount.compareTo(new BigInteger(donateEntry.getValue() +"")) > 0)
       {
         data.addToOtherDonations(donateEntry.getValue());
         data.getOthers().add(donateEntry.getKey());

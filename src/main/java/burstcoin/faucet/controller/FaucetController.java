@@ -69,7 +69,7 @@ import java.util.Set;
 public class FaucetController
 {
   private static final long claimInterval = 1000 * 60 * 60 * BurstcoinFaucetProperties.getClaimInterval();
-  private static final String SECURE_COOKIE_NAME = "lc";
+  private static final String SECURE_COOKIE_NAME = "sc";
   private static Log LOG = LogFactory.getLog(FaucetController.class);
 
   private final RecaptchaValidator recaptchaValidator;
@@ -170,6 +170,14 @@ public class FaucetController
   {
     Locale locale = request.getLocale();
 
+    // warn on empty faucet
+    Balance balance = networkComponent.getBalance(BurstcoinFaucetProperties.getNumericFaucetAccountId());
+    long cleanAmount = cleanAmount(Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0"));
+    if(cleanAmount <= BurstcoinFaucetProperties.getFee() + BurstcoinFaucetProperties.getClaimAmount())
+    {
+      return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.noFunds", new Object[]{}, locale));
+    }
+
     // check recaptcha
     if(recaptchaValidator.validate(request).isSuccess())
     {
@@ -181,103 +189,115 @@ public class FaucetController
       }
       else
       {
-        // check account last claim
-        Account account = getAccount(accountCheck.getAccountId());
-        if(account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
+        // check number of claims
+        if(BurstcoinFaucetProperties.getMaxClaimsPerAccount() == null
+           || BurstcoinFaucetProperties.getMaxClaimsPerAccount() > networkComponent.getNumberOfClaims(accountCheck.getAccountId()))
         {
-          // check ip last claim
-          String ip = request.getHeader("X-FORWARDED-FOR");
-          if(ip == null)
+          // check account last claim
+          Account account = getAccount(accountCheck.getAccountId());
+          if(account.getLastClaim() == null || new Date().getTime() > (account.getLastClaim().getTime() + claimInterval))
           {
-            ip = request.getRemoteAddr();
-          }
-
-          IPAddress ipAddress = null;
-          if(ip != null)
-          {
-            ipAddress = getIPAddress(ip);
-          }
-
-          if(ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval))
-          {
-            // get cookie lastClaim
-            Long lastClaimCookie = null;
-            Cookie[] cookieArray = request.getCookies();
-            if(cookieArray != null)
+            // check ip last claim
+            String ip = request.getHeader("X-FORWARDED-FOR");
+            if(ip == null)
             {
-              List<Cookie> cookies = Arrays.asList(cookieArray);
-              for(Cookie cookie : cookies)
+              ip = request.getRemoteAddr();
+            }
+
+            IPAddress ipAddress = null;
+            if(ip != null)
+            {
+              ipAddress = getIPAddress(ip);
+            }
+
+            if(ipAddress == null || ipAddress.getLastClaim() == null || new Date().getTime() > (ipAddress.getLastClaim().getTime() + claimInterval))
+            {
+              // get cookie lastClaim
+              Long lastClaimCookie = null;
+              Cookie[] cookieArray = request.getCookies();
+              if(cookieArray != null)
               {
-                if(SECURE_COOKIE_NAME.equals(cookie.getName()))
+                List<Cookie> cookies = Arrays.asList(cookieArray);
+                for(Cookie cookie : cookies)
                 {
-                  try
+                  if(SECURE_COOKIE_NAME.equals(cookie.getName()))
                   {
-                    lastClaimCookie = Long.valueOf(cookie.getValue());
-                  }
-                  catch(Exception e)
-                  {
-                    lastClaimCookie = null;
+                    try
+                    {
+                      lastClaimCookie = Long.valueOf(cookie.getValue());
+                    }
+                    catch(Exception e)
+                    {
+                      lastClaimCookie = null;
+                    }
                   }
                 }
               }
-            }
 
-            // check cookie last claim
-            if(lastClaimCookie == null || new Date().getTime() > (lastClaimCookie + claimInterval))
-            {
-              SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), account.getAccountId(),
-                                                                               BurstcoinFaucetProperties.getPassPhrase());
-              if(sendMoneyResponse != null)
+              // check cookie last claim
+              if(lastClaimCookie == null || new Date().getTime() > (lastClaimCookie + claimInterval))
               {
-                // update ip
-                if(ipAddress != null)
+                SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), account.getAccountId(),
+                                                                                 BurstcoinFaucetProperties.getPassPhrase());
+                if(sendMoneyResponse != null)
                 {
-                  ipAddress.setLastClaim(new Date());
-                  ipAddressRepository.save(ipAddress);
+                  // update ip
+                  if(ipAddress != null)
+                  {
+                    ipAddress.setLastClaim(new Date());
+                    ipAddressRepository.save(ipAddress);
+                  }
+
+                  // update account
+                  account.setLastClaim(new Date());
+                  accountRepository.save(account);
+
+                  Cookie lastClaim = new Cookie(SECURE_COOKIE_NAME, String.valueOf(new Date().getTime()));
+                  lastClaim.setMaxAge(60 * 60 * 24 * 90);
+                  response.addCookie(lastClaim);
+
+                  String[] parameters = {String.valueOf(BurstcoinFaucetProperties.getClaimAmount()), account.getAccountId()};
+                  return "redirect:/?success=" + urlEncode(messageSource.getMessage("faucet.msg.send.money", parameters, locale));
                 }
+                else
+                {
+                  LOG.info("Claim failed by 'WALLET_ACCESS', account '" + account.getAccountId() + "'.");
 
-                // update account
-                account.setLastClaim(new Date());
-                accountRepository.save(account);
-
-                Cookie lastClaim = new Cookie(SECURE_COOKIE_NAME, String.valueOf(new Date().getTime()));
-                lastClaim.setMaxAge(60 * 60 * 24 * 90);
-                response.addCookie(lastClaim);
-
-                String[] parameters = {String.valueOf(BurstcoinFaucetProperties.getClaimAmount()), account.getAccountId()};
-                return "redirect:/?success=" + urlEncode(messageSource.getMessage("faucet.msg.send.money", parameters, locale));
+                  return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.walletAccess", null, locale));
+                }
               }
               else
               {
-                LOG.info("Claim failed by 'WALLET_ACCESS', account '" + account.getAccountId() + "'.");
+                LOG.info("Claim denied by COOKIE, account '" + account.getAccountId() + "'.");
 
-                return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.walletAccess", null, locale));
+                long cookieTime = (lastClaimCookie + claimInterval) - new Date().getTime();
+                return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.cookie",
+                                                                                new Object[]{(cookieTime) / (60 * 1000)}, locale));
               }
             }
             else
             {
-              LOG.info("Claim denied by COOKIE, account '" + account.getAccountId() + "'.");
+              LOG.info("Claim denied by IP, account '" + account.getAccountId() + "'.");
 
-              long cookieTime = (lastClaimCookie + claimInterval) - new Date().getTime();
-              return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.cookie",
-                                                                              new Object[]{(cookieTime) / (60 * 1000)}, locale));
+              long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
+              return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.ip", new Object[]{(ipTime) / (60 * 1000)}, locale));
             }
           }
           else
           {
-            LOG.info("Claim denied by IP, account '" + account.getAccountId() + "'.");
+            LOG.info("Claim denied by ACCOUNT, account '" + account.getAccountId() + "'.");
 
-            long ipTime = (ipAddress.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-            return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.ip", new Object[]{(ipTime) / (60 * 1000)}, locale));
+            long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
+            return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.account",
+                                                                            new Object[]{(accountTime) / (60 * 1000)}, locale));
           }
         }
         else
         {
-          LOG.info("Claim denied by ACCOUNT, account '" + account.getAccountId() + "'.");
+          LOG.info("Claim denied by NUMBER_OF_CLAIMS, account '" + accountCheck.getAccountId() + "'.");
 
-          long accountTime = (account.getLastClaim().getTime() + claimInterval) - new Date().getTime();
-          return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.account",
-                                                                          new Object[]{(accountTime) / (60 * 1000)}, locale));
+          return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.claim.denied.numberOfClaims",
+                                                                          new Object[]{(BurstcoinFaucetProperties.getMaxClaimsPerAccount())}, locale));
         }
       }
     }

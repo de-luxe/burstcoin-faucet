@@ -30,6 +30,8 @@ import burstcoin.faucet.network.model.Timestamp;
 import burstcoin.faucet.network.model.Transaction;
 import burstcoin.faucet.network.model.Transactions;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import nxt.crypto.ReedSolomon;
+import nxt.util.Convert;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.eclipse.jetty.client.HttpClient;
@@ -49,6 +51,8 @@ import java.util.concurrent.TimeoutException;
 @Component
 public class NetworkComponent
 {
+  private static final String FAUCET_ACCOUNT_RS = "BURST-" + ReedSolomon
+    .encode(Convert.parseUnsignedLong(BurstcoinFaucetProperties.getNumericFaucetAccountId()));
   private static final String BURST_API_URL = BurstcoinFaucetProperties.getWalletServer() + "/burst";
   private static Log LOG = LogFactory.getLog(NetworkComponent.class);
 
@@ -94,7 +98,75 @@ public class NetworkComponent
     return sendMoneyResponse;
   }
 
-  public Map<String, Transaction> getTransactions(String accountId, int offset, int transactionsPerRequest)
+  // if asset has digits amount will start at lowest digit e.g. 2 digits, amount of 15 will be 0.15 assets
+  public SendMoneyResponse sendAsset(int amount, String numericAssetId, String recipientId, String secretPhrase)
+  {
+    SendMoneyResponse sendMoneyResponse = null;
+    try
+    {
+      ContentResponse response = httpClient.POST(BurstcoinFaucetProperties.getWalletServer() + "/burst")
+        .param("requestType", "transferAsset")
+        .param("asset", numericAssetId)
+        .param("recipient", recipientId)
+        .param("amountNQT", String.valueOf(amount))
+        .param("feeNQT", BurstcoinFaucetProperties.getFee() + "00000000")
+        .param("deadline", "1000")
+        .param("secretPhrase", secretPhrase)
+        .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
+        .send();
+
+      if(!response.getContentAsString().contains("errorDescription"))
+      {
+        sendMoneyResponse = objectMapper.readValue(response.getContentAsString(), SendMoneyResponse.class);
+        LOG.info("send '" + amount + "' BURST to recipientId: '" + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
+      }
+      else
+      {
+        LOG.error("Error: " + response.getContentAsString());
+      }
+    }
+    catch(Exception e)
+    {
+      LOG.warn("Error: Failed to 'sendMoney' to accountId '" + recipientId + "' : " + e.getMessage());
+    }
+    return sendMoneyResponse;
+  }
+
+  public int getNumberOfClaims(String recipientId)
+  {
+
+    Map<String, Transaction> transactions = new HashMap<>();
+    // get all transactions
+    boolean hasMoreTransactions = true;
+    int offset = 0;
+    int transactionsPerRequest = 1999;
+    while(hasMoreTransactions)
+    {
+      Map<String, Transaction> temp = getTransactions(recipientId, offset, transactionsPerRequest, true);
+      if(temp != null && !temp.isEmpty())
+      {
+        hasMoreTransactions = temp.size() >= transactionsPerRequest;
+        transactions.putAll(temp);
+        offset += transactionsPerRequest;
+      }
+      else
+      {
+        hasMoreTransactions = false;
+      }
+    }
+
+    int count = 0;
+    for(Transaction transaction : transactions.values())
+    {
+      if(FAUCET_ACCOUNT_RS.equals(transaction.getSenderRS()))
+      {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  public Map<String, Transaction> getTransactions(String accountId, int offset, int transactionsPerRequest, boolean ignoreException)
   {
     Map<String, Transaction> transactionLookup = null;
     try
@@ -109,7 +181,7 @@ public class NetworkComponent
       request.send(listener);
 
       Response response = listener.get(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS);
-      transactionLookup = handleGetTransactionsResponse(listener, response);
+      transactionLookup = handleGetTransactionsResponse(listener, response, ignoreException);
     }
     catch(Exception e)
     {
@@ -118,7 +190,7 @@ public class NetworkComponent
     return transactionLookup;
   }
 
-  public Map<String, Transaction> getTransactions(String accountId, int timestamp)
+  public Map<String, Transaction> getTransactions(String accountId, int timestamp, boolean ignoreException)
   {
     Map<String, Transaction> transactionLookup = null;
     try
@@ -132,7 +204,7 @@ public class NetworkComponent
       request.send(listener);
 
       Response response = listener.get(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS);
-      transactionLookup = handleGetTransactionsResponse(listener, response);
+      transactionLookup = handleGetTransactionsResponse(listener, response, ignoreException);
     }
     catch(Exception e)
     {
@@ -141,7 +213,7 @@ public class NetworkComponent
     return transactionLookup;
   }
 
-  private Map<String, Transaction> handleGetTransactionsResponse(InputStreamResponseListener listener, Response response)
+  private Map<String, Transaction> handleGetTransactionsResponse(InputStreamResponseListener listener, Response response, boolean ignoreException)
   {
     Map<String, Transaction> transactionLookup = new HashMap<>();
     // Look at the response
@@ -160,7 +232,11 @@ public class NetworkComponent
       }
       catch(Exception e)
       {
-        LOG.error("Failed to receive faucet account transactions.", e);
+        // exception is ok for new accounts
+        if(!ignoreException)
+        {
+          LOG.warn("Failed to receive faucet account transactions.", e);
+        }
       }
     }
     return transactionLookup;
