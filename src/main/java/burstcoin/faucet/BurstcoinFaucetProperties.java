@@ -62,7 +62,9 @@ public class BurstcoinFaucetProperties
   private static Integer claimAmount;
   private static Integer fee;
   private static Integer connectionTimeout;
+
   private static Integer statsUpdateInterval;
+  private static Integer statsAmountOfClaimsToShow;
 
   private static Integer maxClaimsPerAccount;
 
@@ -175,6 +177,15 @@ public class BurstcoinFaucetProperties
       statsUpdateInterval = asInteger("burstcoin.faucet.statsUpdateInterval", 1000 * 60 * 10);
     }
     return statsUpdateInterval;
+  }
+
+  public static int getStatsAmountOfClaimsToShow()
+  {
+    if(statsAmountOfClaimsToShow == null)
+    {
+      statsAmountOfClaimsToShow = asInteger("burstcoin.faucet.statsAmountOfClaimsToShow", 200);
+    }
+    return statsAmountOfClaimsToShow;
   }
 
   public static int getMinDonationAmount()
