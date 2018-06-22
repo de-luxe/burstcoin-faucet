@@ -72,7 +72,7 @@ import java.util.Set;
 public class FaucetController
 {
   private static final long claimInterval = 1000 * 60 * 60 * BurstcoinFaucetProperties.getClaimInterval();
-  private static final String SECURE_COOKIE_NAME = "sc";
+  private static final String SECURE_COOKIE_NAME = "none";
   private static Log LOG = LogFactory.getLog(FaucetController.class);
 
   private final RecaptchaValidator recaptchaValidator;
@@ -178,7 +178,7 @@ public class FaucetController
 
     // warn on empty faucet
     Balance balance = networkComponent.getBalance(BurstcoinFaucetProperties.getNumericFaucetAccountId());
-    long cleanAmount = cleanAmount(Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0"));
+    long cleanAmount = Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0");
     if(cleanAmount <= BurstcoinFaucetProperties.getFee() + BurstcoinFaucetProperties.getClaimAmount())
     {
       return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.noFunds", new Object[]{}, locale));

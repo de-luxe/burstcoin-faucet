@@ -59,23 +59,42 @@ public class NetworkComponent
   private ObjectMapper objectMapper;
   private HttpClient httpClient;
 
+  private Map<Long, Integer> txPerBlock;
+
   @Autowired
   public NetworkComponent(HttpClient httpClient, ObjectMapper objectMapper)
   {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
+    txPerBlock = new HashMap<>();
   }
 
   public SendMoneyResponse sendMoney(int amount, String recipientId, String secretPhrase)
   {
+    MiningInfo miningInfo = getMiningInfo();
+
+    if(miningInfo == null)
+    {
+      return null;
+    }
+
+    if(!txPerBlock.containsKey(miningInfo.getHeight()))
+    {
+      txPerBlock.put(miningInfo.getHeight(), 1);
+    }
+    else
+    {
+      txPerBlock.put(miningInfo.getHeight(), txPerBlock.get(miningInfo.getHeight()) + 1);
+    }
+
     SendMoneyResponse sendMoneyResponse = null;
     try
     {
       ContentResponse response = httpClient.POST(BurstcoinFaucetProperties.getWalletServer() + "/burst")
         .param("requestType", "sendMoney")
         .param("recipient", recipientId)
-        .param("amountNQT", amount + "00000000")
-        .param("feeNQT", BurstcoinFaucetProperties.getFee() + "00000000")
+        .param("amountNQT", String.valueOf(amount))
+        .param("feeNQT", String.valueOf(txPerBlock.get(miningInfo.getHeight()) * BurstcoinFaucetProperties.getFee()))
         .param("deadline", "1000")
         .param("secretPhrase", secretPhrase)
         .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
@@ -84,7 +103,7 @@ public class NetworkComponent
       if(!response.getContentAsString().contains("errorDescription"))
       {
         sendMoneyResponse = objectMapper.readValue(response.getContentAsString(), SendMoneyResponse.class);
-        LOG.info("send '" + amount + "' BURST to recipientId: '" + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
+        LOG.info("send '" + amount + "' Plank to recipientId: '" + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
       }
       else
       {
@@ -109,7 +128,7 @@ public class NetworkComponent
         .param("asset", numericAssetId)
         .param("recipient", recipientId)
         .param("amountNQT", String.valueOf(amount))
-        .param("feeNQT", BurstcoinFaucetProperties.getFee() + "00000000")
+        .param("feeNQT", BurstcoinFaucetProperties.getFee() + "00000000") // todo
         .param("deadline", "1000")
         .param("secretPhrase", secretPhrase)
         .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
