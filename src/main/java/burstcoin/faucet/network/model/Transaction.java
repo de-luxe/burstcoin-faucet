@@ -23,8 +23,9 @@
 package burstcoin.faucet.network.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class Transaction
 {
   private String senderPublicKey;

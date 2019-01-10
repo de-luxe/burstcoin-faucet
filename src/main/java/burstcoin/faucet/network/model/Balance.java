@@ -22,6 +22,9 @@
 
 package burstcoin.faucet.network.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class Balance
 {
   private String unconfirmedBalanceNQT;

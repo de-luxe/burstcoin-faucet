@@ -22,17 +22,13 @@
 
 package burstcoin.faucet.network.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class SendMoneyResponse
 {
   private String signatureHash;
   private String unsignedTransactionBytes;
-
-  @JsonIgnore
-  private Object transactionJSON;
 
   private boolean broadcasted;
   private int requestProcessingTime;
@@ -48,11 +44,6 @@ public class SendMoneyResponse
   public String getUnsignedTransactionBytes()
   {
     return unsignedTransactionBytes;
-  }
-
-  public Object getTransactionJSON()
-  {
-    return transactionJSON;
   }
 
   public boolean isBroadcasted()
