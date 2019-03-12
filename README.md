@@ -17,7 +17,7 @@ Requirements:
 
 Setup:
 - edit 'faucet.properties' (e.g. rename faucet.default.properties) 
-- execute 'java -jar burstcoin-faucet-0.4.0-SNAPSHOT.jar' or start via included run script.
+- execute 'java -jar burstcoin-faucet-0.4.0-RELEASE.jar' or start via included run script.
 
 
 
