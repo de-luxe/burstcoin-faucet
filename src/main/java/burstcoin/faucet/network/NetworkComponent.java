@@ -29,6 +29,7 @@ import burstcoin.faucet.network.model.SendMoneyResponse;
 import burstcoin.faucet.network.model.Timestamp;
 import burstcoin.faucet.network.model.Transaction;
 import burstcoin.faucet.network.model.Transactions;
+import burstcoin.faucet.util.FormatUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import nxt.crypto.ReedSolomon;
 import nxt.util.Convert;
@@ -44,6 +45,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -69,7 +71,7 @@ public class NetworkComponent
     txPerBlock = new HashMap<>();
   }
 
-  public SendMoneyResponse sendMoney(int amount, String recipientId, String secretPhrase)
+  public SendMoneyResponse sendMoney(long amount, String recipientId, String secretPhrase, Locale locale)
   {
     MiningInfo miningInfo = getMiningInfo();
 
@@ -103,7 +105,8 @@ public class NetworkComponent
       if(!response.getContentAsString().contains("errorDescription"))
       {
         sendMoneyResponse = objectMapper.readValue(response.getContentAsString(), SendMoneyResponse.class);
-        LOG.info("send '" + amount + "' Plank to recipientId: '" + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
+        LOG.info("send '" + FormatUtil.formatAmount(amount, FormatUtil.getFormatter(locale)) + "' BURST to recipientId: '"
+                 + recipientId + "' in '" + sendMoneyResponse.getRequestProcessingTime() + "' ms");
       }
       else
       {
@@ -336,28 +339,4 @@ public class NetworkComponent
     }
     return result;
   }
-
-//  public UnconfirmedTransactions getUnconfirmedTransactions()
-//  {
-//    UnconfirmedTransactions result = null;
-//    try
-//    {
-//      ContentResponse response;
-//      response = httpClient.newRequest(BurstcoinFaucetProperties.getWalletServer() + "/burst?requestType=getUnconfirmedTransactions")
-//        .timeout(BurstcoinFaucetProperties.getConnectionTimeout(), TimeUnit.MILLISECONDS)
-//        .send();
-//
-//      result = objectMapper.readValue(response.getContentAsString(), UnconfirmedTransactions.class);
-//    }
-//    catch(TimeoutException timeoutException)
-//    {
-//      LOG.warn("Unable to get unconfirmed transactions caused by connectionTimeout, currently '" + (BurstcoinFaucetProperties.getConnectionTimeout() / 1000)
-//               + " sec.' try increasing it!");
-//    }
-//    catch(Exception e)
-//    {
-//      LOG.trace("Unable to get mining info from wallet: " + e.getMessage());
-//    }
-//    return result;
-//  }
 }

@@ -59,8 +59,9 @@ public class BurstcoinFaucetProperties
 
   private static Integer minDonationAmount;
   private static Integer claimInterval;
-  private static Integer claimAmount;
+  private static Long claimAmount;
   private static Integer fee;
+  private static Integer digits;
   private static Integer connectionTimeout;
 
   private static Integer statsUpdateInterval;
@@ -197,11 +198,11 @@ public class BurstcoinFaucetProperties
     return minDonationAmount;
   }
 
-  public static int getClaimAmount()
+  public static long getClaimAmount()
   {
     if(claimAmount == null)
     {
-      claimAmount = asInteger("burstcoin.faucet.claimAmount", 3);
+      claimAmount = asLong("burstcoin.faucet.claimAmount", 3L);
     }
     return claimAmount;
   }
@@ -213,6 +214,15 @@ public class BurstcoinFaucetProperties
       fee = asInteger("burstcoin.faucet.fee", 1);
     }
     return fee;
+  }
+
+  public static int getDigits()
+  {
+    if(digits == null)
+    {
+      digits = asInteger("burstcoin.faucet.digits", 3);
+    }
+    return digits;
   }
 
   private static Integer asInteger(String key, Integer defaultValue)
@@ -228,6 +238,24 @@ public class BurstcoinFaucetProperties
       catch(NumberFormatException e)
       {
         LOG.error("value of property: '" + key + "' should be a numeric (int) value.");
+      }
+    }
+    return value != null ? value : defaultValue;
+  }
+
+  private static Long asLong(String key, Long defaultValue)
+  {
+    String integerProperty = PROPS.containsKey(key) ? String.valueOf(PROPS.getProperty(key)) : null;
+    Long value = null;
+    if(!StringUtils.isEmpty(integerProperty))
+    {
+      try
+      {
+        value = Long.valueOf(integerProperty);
+      }
+      catch(NumberFormatException e)
+      {
+        LOG.error("value of property: '" + key + "' should be a numeric (long) value.");
       }
     }
     return value != null ? value : defaultValue;

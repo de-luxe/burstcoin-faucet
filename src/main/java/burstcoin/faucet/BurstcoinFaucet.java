@@ -43,6 +43,16 @@ public class BurstcoinFaucet
 {
   private static Log LOG = LogFactory.getLog(BurstcoinFaucet.class);
 
+  private static double JAVA_VERSION;
+
+  static
+  {
+    String version = System.getProperty("java.version");
+    int pos = version.indexOf('.');
+    pos = version.indexOf('.', pos + 1);
+    JAVA_VERSION = Double.parseDouble(version.substring(0, pos));
+  }
+
   @Bean
   protected ServletContextListener listener()
   {
@@ -95,16 +105,26 @@ public class BurstcoinFaucet
   public static void main(String[] args)
     throws Exception
   {
-    LOG.info("Starting the engines ... please wait!");
+    // inform users with java9+, that faucet will not function with it.
+    if(1.8d != JAVA_VERSION)
+    {
+      LOG.error("Java8 (1.8) needed!");
+      LOG.error("java version '" + JAVA_VERSION + "' is not supported!");
+      LOG.error("Uninstall your java '" + JAVA_VERSION + "' and install Java8!");
+    }
+    else
+    {
+      LOG.info("Starting the engines ... please wait!");
 
-    // overwritten by application.properties
-    Map<String, Object> properties = new HashMap<String, Object>();
-    properties.put("server.port", BurstcoinFaucetProperties.getServerPort());
-    properties.put("recaptcha.validation.secretKey", BurstcoinFaucetProperties.getPrivateKey());
+      // overwritten by application.properties
+      Map<String, Object> properties = new HashMap<String, Object>();
+      properties.put("server.port", BurstcoinFaucetProperties.getServerPort());
+      properties.put("recaptcha.validation.secretKey", BurstcoinFaucetProperties.getPrivateKey());
 
-    new SpringApplicationBuilder(BurstcoinFaucet.class)
-      .properties(properties)
-      .build(args)
-      .run();
+      new SpringApplicationBuilder(BurstcoinFaucet.class)
+        .properties(properties)
+        .build(args)
+        .run();
+    }
   }
 }

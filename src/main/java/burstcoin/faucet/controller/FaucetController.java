@@ -34,6 +34,7 @@ import burstcoin.faucet.network.NetworkComponent;
 import burstcoin.faucet.network.model.Balance;
 import burstcoin.faucet.network.model.MiningInfo;
 import burstcoin.faucet.network.model.SendMoneyResponse;
+import burstcoin.faucet.util.FormatUtil;
 import com.github.mkopylec.recaptcha.validation.RecaptchaValidationException;
 import com.github.mkopylec.recaptcha.validation.RecaptchaValidator;
 import com.github.mkopylec.recaptcha.validation.ValidationResult;
@@ -57,6 +58,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -128,6 +130,9 @@ public class FaucetController
     if(stats != null)
     {
       Locale locale = request.getLocale();
+
+      NumberFormat amountFormatter = FormatUtil.getFormatter(locale);
+
       Balance balance = networkComponent.getBalance(BurstcoinFaucetProperties.getNumericFaucetAccountId());
 
       model.addAttribute("reCaptchaPublicKey", BurstcoinFaucetProperties.getPublicKey());
@@ -137,9 +142,11 @@ public class FaucetController
       for(Map.Entry<String, Long> donateEntry : stats.getDonateLookup().entrySet())
       {
         donations.add(messageSource.getMessage("faucet.stats.donations.account",
-                                               new Object[]{donateEntry.getKey(), cleanAmount(donateEntry.getValue())}, locale));
+                                               new Object[]{donateEntry.getKey(),
+                                                            FormatUtil.formatAmount(donateEntry.getValue(), amountFormatter)}, locale));
       }
-      donations.add(messageSource.getMessage("faucet.stats.donations.other", new Object[]{cleanAmount(stats.getOthersDonations())}, locale));
+      donations.add(messageSource.getMessage("faucet.stats.donations.other",
+                                             new Object[]{FormatUtil.formatAmount(stats.getOthersDonations(), amountFormatter)}, locale));
 
       // no lookup needed anymore, add to list an sort
       List<ClaimStat> claimStats = new ArrayList<>(stats.getClaimLookup().values());
@@ -151,21 +158,24 @@ public class FaucetController
       {
         ClaimStat claimStat = iterator.next();
         claims.add(messageSource.getMessage("faucet.stats.claims.account",
-                                            new Object[]{claimStat.getNumberOfClaims(), claimStat.getAccountRS(), cleanAmount(claimStat.getClaimed())},
+                                            new Object[]{claimStat.getNumberOfClaims(), claimStat.getAccountRS(),
+                                                         FormatUtil.formatAmount(claimStat.getClaimed(), amountFormatter)},
                                             locale));
       }
 
-      model.addAttribute("totalClaimed", messageSource.getMessage("faucet.stats.claims.summary",
-                                                                  new Object[]{cleanAmount(stats.getTotalClaims()), claimStats.size()}, locale));
-      model.addAttribute("totalDonated", messageSource.getMessage("faucet.stats.donations.summary",
-                                                                  new Object[]{cleanAmount(stats.getTotalDonations()),
-                                                                               stats.getDonateLookup().size() + stats.getOthers().size()}, locale));
+      model.addAttribute("totalClaimed", messageSource.getMessage(
+        "faucet.stats.claims.summary",
+        new Object[]{FormatUtil.formatAmount(stats.getTotalClaims(), amountFormatter), claimStats.size()}, locale));
+      model.addAttribute("totalDonated", messageSource.getMessage(
+        "faucet.stats.donations.summary",
+        new Object[]{FormatUtil.formatAmount(stats.getTotalDonations(), amountFormatter),
+                     stats.getDonateLookup().size() + stats.getOthers().size()}, locale));
       model.addAttribute("donations", donations);
       model.addAttribute("claims", claims);
 
       model.addAttribute("linkUrl", messageSource.getMessage("faucet.link.url", null, locale));
-      long cleanAmount = cleanAmount(Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0"));
-      model.addAttribute("linkText", messageSource.getMessage("faucet.link.text", new Object[]{faucetAccountRS, cleanAmount}, locale));
+      String amount = FormatUtil.formatAmount(Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0"), amountFormatter);
+      model.addAttribute("linkText", messageSource.getMessage("faucet.link.text", new Object[]{faucetAccountRS, amount}, locale));
       return "index";
     }
     else
@@ -199,8 +209,8 @@ public class FaucetController
 
         // warn on empty faucet
         Balance balance = networkComponent.getBalance(BurstcoinFaucetProperties.getNumericFaucetAccountId());
-        long cleanAmount = Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0");
-        if(cleanAmount <= BurstcoinFaucetProperties.getFee() + BurstcoinFaucetProperties.getClaimAmount())
+        long amount = Long.valueOf(balance != null ? balance.getUnconfirmedBalanceNQT() : "0");
+        if(amount <= BurstcoinFaucetProperties.getFee() + BurstcoinFaucetProperties.getClaimAmount())
         {
           return "redirect:/?error=" + urlEncode(messageSource.getMessage("faucet.error.noFunds", new Object[]{}, locale));
         }
@@ -299,7 +309,7 @@ public class FaucetController
                     if(lastClaimCookie == null || new Date().getTime() > (lastClaimCookie + claimInterval))
                     {
                       SendMoneyResponse sendMoneyResponse = networkComponent.sendMoney(BurstcoinFaucetProperties.getClaimAmount(), account.getAccountId(),
-                                                                                       BurstcoinFaucetProperties.getPassPhrase());
+                                                                                       BurstcoinFaucetProperties.getPassPhrase(), locale);
                       if(sendMoneyResponse != null)
                       {
                         // update ip
@@ -319,7 +329,8 @@ public class FaucetController
 
                         LOCK.remove(accountId);
 
-                        String[] parameters = {String.valueOf(BurstcoinFaucetProperties.getClaimAmount()), account.getAccountId()};
+                        NumberFormat formatter = FormatUtil.getFormatter(locale);
+                        String[] parameters = { FormatUtil.formatAmount(BurstcoinFaucetProperties.getClaimAmount(), formatter), account.getAccountId()};
                         return "redirect:/?success=" + urlEncode(messageSource.getMessage("faucet.msg.send.money", parameters, locale));
                       }
                       else
@@ -485,10 +496,5 @@ public class FaucetController
       ipAddressRepository.save(ipAddress);
     }
     return ipAddress;
-  }
-
-  private long cleanAmount(Long amount)
-  {
-    return amount / 100000000;
   }
 }
